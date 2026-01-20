@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Save, XCircle } from 'lucide-react';
 import { saveShiftReport, closeShift, getShiftReport } from '@/app/actions/production';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
 
 // Types
 interface Machine {
@@ -196,7 +197,10 @@ export function ProductionTable({
     setItems(prev => prev.map(item => {
         if (item.machineId !== machineId) return item;
         const newDetails = [...item.details];
-        newDetails[detailIndex].variations = [...newDetails[detailIndex].variations, createEmptyVariation()];
+        newDetails[detailIndex] = {
+            ...newDetails[detailIndex],
+            variations: [...newDetails[detailIndex].variations, createEmptyVariation()]
+        };
         return { ...item, details: newDetails };
     }));
   };
@@ -206,13 +210,13 @@ export function ProductionTable({
         if (item.machineId !== machineId) return item;
         const newDetails = [...item.details];
         const newVariations = newDetails[detailIndex].variations.filter((_, idx) => idx !== variationIndex);
-        // Ensure at least one variation row exists if we want to show input fields? 
-        // Or if empty, maybe show "Add Variation" button only. 
-        // The image shows "+ Sin variaciones" which implies we can have 0 or 1 empty one.
-        // Let's keep at least one empty one to match the 'grid' feel or allow fully empty.
-        // If we remove the last one, maybe add an empty one back? 
+        
         if (newVariations.length === 0) newVariations.push(createEmptyVariation());
-        newDetails[detailIndex].variations = newVariations;
+        
+        newDetails[detailIndex] = {
+            ...newDetails[detailIndex],
+            variations: newVariations
+        };
         return { ...item, details: newDetails };
     }));
   };
@@ -302,18 +306,18 @@ export function ProductionTable({
         <table className="w-full text-sm text-left border-collapse">
             <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
                 <tr>
-                    <th className="p-2 border">Machine</th>
-                    <th className="p-2 border">Operator</th>
-                    <th className="p-2 border">OT</th>
-                    <th className="p-2 border">Efficiency</th>
-                    <th className="p-2 border">MT PROG</th>
-                    <th className="p-2 border">MT PROD</th>
-                    <th className="p-2 border">KG PROD</th>
-                    <th className="p-2 border">KG DESP</th>
-                    <th className="p-2 border">% Desp</th>
-                    <th className="p-2 border">Variations</th>
-                    <th className="p-2 border">Cause</th>
-                    <th className="p-2 border">Analysis</th>
+                    <th className="p-2 border w-[120px]">Machine</th>
+                    <th className="p-2 border w-[160px]">Operator</th>
+                    <th className="p-2 border w-[140px]">OT</th>
+                    <th className="p-2 border w-[80px]">Efficiency</th>
+                    <th className="p-2 border w-[120px]">MT PROG</th>
+                    <th className="p-2 border w-[120px]">MT PROD</th>
+                    <th className="p-2 border w-[80px]">KG PROD</th>
+                    <th className="p-2 border w-[80px]">KG DESP</th>
+                    <th className="p-2 border w-[70px]">% Desp</th>
+                    <th className="p-2 border w-[120px]">Variations</th>
+                    <th className="p-2 border w-[160px]">Cause</th>
+                    <th className="p-2 border min-w-[250px]">Analysis</th>
                 </tr>
             </thead>
             <tbody>
@@ -407,7 +411,7 @@ function MachineRow({
                         {/* Detail Columns: Render only on first row of the detail */}
                         {vIndex === 0 && (
                             <>
-                                <td rowSpan={variationRows} className="p-2 border align-top min-w-[120px]">
+                                <td rowSpan={variationRows} className="p-2 border align-top min-w-[120px] max-w-[120px]">
                                     <div className="flex flex-col gap-1">
                                         <Input 
                                             value={detail.ot} 
@@ -441,7 +445,7 @@ function MachineRow({
                                     <Input 
                                         value={detail.mtProg} 
                                         onChange={(e) => onDetailChange(item.machineId, dIndex, 'mtProg', e.target.value)}
-                                        className="w-20 h-8"
+                                        className="w-full h-8"
                                         disabled={readOnly}
                                     />
                                 </td>
@@ -449,7 +453,7 @@ function MachineRow({
                                     <Input 
                                         value={detail.mtProd} 
                                         onChange={(e) => onDetailChange(item.machineId, dIndex, 'mtProd', e.target.value)}
-                                        className="w-20 h-8"
+                                        className="w-full h-8"
                                         disabled={readOnly}
                                     />
                                 </td>
@@ -478,14 +482,15 @@ function MachineRow({
                         {/* Variation Columns */}
                         <td className="p-2 border align-top">
                             <Select 
-                                value={variation.stage} 
-                                onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'stage', v)}
+                                value={variation.stage || ''} 
+                                onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'stage', v === '_CLEAR_' ? '' : v)}
                                 disabled={readOnly}
                             >
                                 <SelectTrigger className="w-[100px] h-8">
                                     <SelectValue placeholder="Stage" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="_CLEAR_">-- Vacío --</SelectItem>
                                     <SelectItem value="T1">T1</SelectItem>
                                     <SelectItem value="T2">T2</SelectItem>
                                     <SelectItem value="T3">T3</SelectItem>
@@ -523,11 +528,11 @@ function MachineRow({
                             </Select>
                         </td>
                         <td className="p-2 border align-top">
-                            <Input 
+                            <Textarea 
                                 value={variation.analysis} 
                                 onChange={(e) => onVariationChange(item.machineId, dIndex, vIndex, 'analysis', e.target.value)}
                                 placeholder="Analysis..."
-                                className="h-8 min-w-[200px]"
+                                className="min-h-[80px] min-w-[200px] resize-y"
                                 disabled={readOnly}
                             />
                         </td>

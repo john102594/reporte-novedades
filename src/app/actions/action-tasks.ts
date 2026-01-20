@@ -86,6 +86,7 @@ export async function updateTaskCause(taskId: string, newCause: string) {
   }
 }
 
+
 export async function approveActionPlan(taskId: string) {
   const session = await getSession();
   if (!session || session.role !== 'MANAGER') {
@@ -104,6 +105,27 @@ export async function approveActionPlan(taskId: string) {
   } catch (error) {
     console.error('Error approving action plan:', error);
     return { error: 'Failed to approve plan' };
+  }
+}
+
+export async function revokeActionPlan(taskId: string) {
+  const session = await getSession();
+  if (!session || session.role !== 'MANAGER') {
+    return { error: 'Unauthorized: Only Managers can revoke action plans' };
+  }
+
+  try {
+    const task = await prisma.actionTask.update({
+      where: { id: taskId },
+      data: {
+        status: 'POR_REVISAR'
+      }
+    });
+    revalidatePath('/action-plans');
+    return { success: true, task };
+  } catch (error) {
+    console.error('Error revoking action plan:', error);
+    return { error: 'Failed to revoke plan' };
   }
 }
 

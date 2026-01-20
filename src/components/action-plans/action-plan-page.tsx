@@ -23,21 +23,21 @@ interface ActionTask {
 }
 
 export default function ActionPlanPage({ currentUser, users, causes }: { 
-  currentUser: { id: string; role: string }, 
-  users: { id: string; name: string; role: string }[], 
+  currentUser: { id: string; role: string } | null, 
+  users: { id: string; name: string | null; role: string }[], 
   causes: { id: string; name: string }[] 
 }) {
   const [tasks, setTasks] = useState<ActionTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
 
-  const fetchTasks = async () => {
-    setLoading(true);
+  const fetchTasks = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const data = await getActionTasks();
     if (!('error' in data)) {
       setTasks(data as any);
     }
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   useEffect(() => {
@@ -170,7 +170,7 @@ export default function ActionPlanPage({ currentUser, users, causes }: {
                       currentUser={currentUser} 
                       users={users} 
                       causes={causes}
-                      onUpdate={fetchTasks} 
+                      onUpdate={() => fetchTasks(false)} 
                     />
                   </TableCell>
                 </TableRow>
