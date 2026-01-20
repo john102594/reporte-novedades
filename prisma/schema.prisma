@@ -1,0 +1,269 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User & Role Management
+model User {
+  id       String  @id @default(uuid())
+  username String? @unique
+  email    String? @unique
+  name     String?
+  role     String // Using String for SQLite compatibility (mapped to Role enum in app)
+  password String // In a real app, hashed.
+
+  // Relations
+  coordinatedAreas Area[] @relation("AreaCoordinators")
+  managedAreas     Area[] @relation("AreaGestores")
+
+  operatedMachines Machine[] @relation("MachineOperators")
+
+  actionPlans ActionPlan[] // Tasks assigned to this user
+  actionTasks ActionTask[]         @relation("TaskResponsible")
+  activities  ActionTaskActivity[] @relation("ActivityResponsible")
+
+  // Reporting relations
+  managedReports   ShiftReport[]     @relation("ReportGestor")
+  shiftReportItems ShiftReportItem[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  shiftReports ShiftReport[]
+}
+
+model Area {
+  id   String @id @default(uuid())
+  name String @unique // Extrusion, Printing, etc.
+
+  machines     Machine[]
+  coordinators User[]           @relation("AreaCoordinators")
+  gestores     User[]           @relation("AreaGestores")
+  programs     FailureProgram[]
+  shiftReports ShiftReport[]
+}
+
+model Machine {
+  id     String @id @default(uuid())
+  name   String
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  operators User[] @relation("MachineOperators")
+
+  standards        Standard[]
+  orders           ProductionOrder[]
+  shiftReportItems ShiftReportItem[]
+  shiftReports     ShiftReport[]
+}
+
+model FailureProgram {
+  id                    String                 @id @default(uuid())
+  name                  String
+  areaId                String
+  area                  Area                   @relation(fields: [areaId], references: [id])
+  shiftReportVariations ShiftReportVariation[]
+}
+
+// Configuration
+model Standard {
+  id        String  @id @default(uuid())
+  machineId String
+  machine   Machine @relation(fields: [machineId], references: [id])
+
+  // Standard Values
+  t1_setup_min     Float
+  t5_run_speed_mpm Float // Meters per minute
+
+  // Printing Specifics
+  t2_calibration_min Float?
+  t3_toning_min      Float?
+  t4_approval_min    Float?
+}
+
+// Production Flow
+model ProductionOrder {
+  id          String @id @default(uuid())
+  otNumber    String @unique
+  productName String
+
+  machineId String
+  machine   Machine @relation(fields: [machineId], references: [id])
+
+  status String @default("OPEN") // OPEN, VALIDATION_REQUIRED, CLOSED
+
+  // Timestamps
+  startTime DateTime?
+  endTime   DateTime?
+
+  // Metrics (Actuals)
+  totalMeters Float @default(0)
+  kgProduced  Float @default(0)
+  kgWaste     Float @default(0)
+
+  // Time Breakdown (Actuals)
+  t1_setup_actual       Float  @default(0)
+  t5_run_time_actual    Float  @default(0)
+  t2_calibration_actual Float?
+  t3_toning_actual      Float?
+  t4_approval_actual    Float?
+
+  variations VariationRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Quality & Validator Engine
+model VariationRecord {
+  id    String          @id @default(uuid())
+  otId  String
+  order ProductionOrder @relation(fields: [otId], references: [id])
+
+  type      String // EFFICIENCY, WASTE
+  value     Float // Actual deviation value
+  threshold Float // The 20% threshold triggered
+
+  // Cause Matrix
+  event         String // "Variation in T3"
+  rootCause     String // "Ink viscosity"
+  failedProgram String // "Ink Mfg Program"
+  failureType   String // USAGE, SYSTEMIC
+
+  actionPlan ActionPlan?
+
+  createdAt DateTime @default(now())
+}
+
+// Action Logic
+model ActionPlan {
+  id          String          @id @default(uuid())
+  variationId String          @unique
+  variation   VariationRecord @relation(fields: [variationId], references: [id])
+
+  responsibleId String
+  responsible   User   @relation(fields: [responsibleId], references: [id])
+
+  description String
+  status      String    @default("PENDING") // PENDING, IN_PROGRESS, DONE
+  deadline    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -- NEW MODELS FOR REPORTING --
+
+model ShiftReport {
+  id     String   @id @default(uuid())
+  date   DateTime
+  shift  String // MORNING, AFTERNOON, NIGHT, T1, T2
+  areaId String
+  area   Area     @relation(fields: [areaId], references: [id])
+  status String   @default("OPEN") // OPEN, CLOSED
+
+  gestorId String?
+  gestor   User?   @relation("ReportGestor", fields: [gestorId], references: [id])
+
+  items ShiftReportItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  machine   Machine? @relation(fields: [machineId], references: [id])
+  machineId String?
+
+  @@unique([date, shift, areaId])
+}
+
+model ShiftReportItem {
+  id       String      @id @default(uuid())
+  reportId String
+  report   ShiftReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  machineId String
+  machine   Machine @relation(fields: [machineId], references: [id])
+
+  operatorId String?
+  operator   User?   @relation(fields: [operatorId], references: [id])
+
+  status String @default("ACTIVE") // ACTIVE, UNPROGRAMMED
+
+  details ShiftReportDetail[]
+}
+
+model ShiftReportDetail {
+  id     String          @id @default(uuid())
+  itemId String
+  item   ShiftReportItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  ot         String
+  efficiency Float? // Store as percentage value e.g. 85.5
+  mtProg     Float?
+  mtProd     Float?
+  kgProd     Float?
+  kgDesp     Float?
+
+  variations ShiftReportVariation[]
+}
+
+model ShiftReportVariation {
+  id       String            @id @default(uuid())
+  detailId String
+  detail   ShiftReportDetail @relation(fields: [detailId], references: [id], onDelete: Cascade)
+
+  stage     String? // "T1", "T5" etc
+  programId String?
+  program   FailureProgram? @relation(fields: [programId], references: [id])
+  analysis  String? // Manual text
+
+  actionTask ActionTask?
+}
+
+model ActionTask {
+  id          String               @id @default(uuid())
+  variationId String               @unique
+  variation   ShiftReportVariation @relation(fields: [variationId], references: [id], onDelete: Cascade)
+
+  // Information from variation
+  ot      String
+  cause   String // Causa indicada por gestor (FailureProgram name)
+  details String // Analysis field from variation
+
+  // Analysis by Coordinator
+  rootCauseAnalysis String?
+
+  status String @default("POR_REVISAR") // POR_REVISAR, REVISADA, EN_PLAN_DE_ACCION, FINALIZADA
+
+  responsibleId String?
+  responsible   User?   @relation("TaskResponsible", fields: [responsibleId], references: [id])
+
+  activities ActionTaskActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActionTaskActivity {
+  id     String     @id @default(uuid())
+  taskId String
+  task   ActionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  description String
+  deadline    DateTime
+
+  responsibleId String
+  responsible   User   @relation("ActivityResponsible", fields: [responsibleId], references: [id])
+
+  status String @default("PENDIENTE") // PENDIENTE, EN_PROCESO, EN_APROBACION, FINALIZADA
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
