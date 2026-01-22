@@ -42,7 +42,7 @@ export async function getActionTasks() {
 
 export async function updateTaskAnalysis(taskId: string, rca: string, responsibleId: string) {
   const session = await getSession();
-  if (!session || (session.role !== 'COORDINATOR' && session.role !== 'MANAGER')) {
+  if (!session || (session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'MANAGER')) {
     return { error: 'Unauthorized: Only Coordinators or Managers can perform analysis' };
   }
 
@@ -67,7 +67,7 @@ export async function updateTaskAnalysis(taskId: string, rca: string, responsibl
 
 export async function updateTaskCause(taskId: string, newCause: string) {
   const session = await getSession();
-  if (!session || (session.role !== 'COORDINATOR' && session.role !== 'MANAGER')) {
+  if (!session || (session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'MANAGER')) {
     return { error: 'Unauthorized: Only Coordinators or Managers can update the cause' };
   }
 
@@ -86,9 +86,10 @@ export async function updateTaskCause(taskId: string, newCause: string) {
   }
 }
 
+
 export async function approveActionPlan(taskId: string) {
   const session = await getSession();
-  if (!session || session.role !== 'MANAGER') {
+  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
     return { error: 'Unauthorized: Only Managers can approve action plans' };
   }
 
@@ -104,6 +105,27 @@ export async function approveActionPlan(taskId: string) {
   } catch (error) {
     console.error('Error approving action plan:', error);
     return { error: 'Failed to approve plan' };
+  }
+}
+
+export async function revokeActionPlan(taskId: string) {
+  const session = await getSession();
+  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
+    return { error: 'Unauthorized: Only Managers can revoke action plans' };
+  }
+
+  try {
+    const task = await prisma.actionTask.update({
+      where: { id: taskId },
+      data: {
+        status: 'POR_REVISAR'
+      }
+    });
+    revalidatePath('/action-plans');
+    return { success: true, task };
+  } catch (error) {
+    console.error('Error revoking action plan:', error);
+    return { error: 'Failed to revoke plan' };
   }
 }
 
@@ -148,7 +170,7 @@ export async function updateActivityStatus(activityId: string, status: string) {
 
 export async function approveActivity(activityId: string) {
   const session = await getSession();
-  if (!session || session.role !== 'MANAGER') {
+  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
     return { error: 'Unauthorized: Only Managers can finalize activities' };
   }
 
