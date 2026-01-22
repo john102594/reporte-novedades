@@ -58,13 +58,13 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes }:
   const [newActResp, setNewActResp] = useState('');
   const [newActDate, setNewActDate] = useState('');
 
-  const canEditRCA = (currentUser?.role === 'COORDINATOR' || currentUser?.role === 'MANAGER') && 
+  const canEditRCA = (currentUser?.role?.toUpperCase() === 'COORDINATOR' || currentUser?.role?.toUpperCase() === 'MANAGER') && 
                      (task.status === 'POR_REVISAR' || task.status === 'REVISADA');
   
-  const canApprovePlan = currentUser?.role === 'MANAGER' && task.status === 'REVISADA';
-  const canRevokePlan = currentUser?.role === 'MANAGER' && task.status === 'EN_PLAN_DE_ACCION';
+  const canApprovePlan = currentUser?.role?.toUpperCase() === 'MANAGER' && task.status === 'REVISADA';
+  const canRevokePlan = currentUser?.role?.toUpperCase() === 'MANAGER' && task.status === 'EN_PLAN_DE_ACCION';
   
-  const canAddActivity = (currentUser?.role === 'COORDINATOR' || currentUser?.role === 'MANAGER') && 
+  const canAddActivity = (currentUser?.role?.toUpperCase() === 'COORDINATOR' || currentUser?.role?.toUpperCase() === 'MANAGER') && 
                          (task.status === 'REVISADA' || task.status === 'EN_PLAN_DE_ACCION');
 
   const handleUpdateCause = async () => {
@@ -116,7 +116,7 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes }:
     if ('success' in res) onUpdate();
   };
 
-  const filteredUsers = users.filter(u => ['MANAGER', 'COORDINATOR'].includes(u.role));
+  const filteredUsers = users.filter(u => ['MANAGER', 'COORDINATOR'].includes(u.role?.toUpperCase() || ''));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -277,17 +277,17 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes }:
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {act.status === 'PENDIENTE' && (currentUser?.id === act.responsibleId || currentUser?.role === 'MANAGER') && (
+                          {act.status === 'PENDIENTE' && (currentUser?.id === act.responsibleId || currentUser?.role?.toUpperCase() === 'MANAGER') && (
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleUpdateActStatus(act.id, 'EN_PROCESO')}>
                               <Clock className="w-3 h-3 text-orange-500" />
                             </Button>
                           )}
-                          {act.status === 'EN_PROCESO' && (currentUser?.id === act.responsibleId || currentUser?.role === 'MANAGER') && (
+                          {act.status === 'EN_PROCESO' && (currentUser?.id === act.responsibleId || currentUser?.role?.toUpperCase() === 'MANAGER') && (
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleUpdateActStatus(act.id, 'EN_APROBACION')}>
                               <Send className="w-3 h-3 text-blue-500" />
                             </Button>
                           )}
-                          {act.status === 'EN_APROBACION' && currentUser?.role === 'MANAGER' && (
+                          {act.status === 'EN_APROBACION' && currentUser?.role?.toUpperCase() === 'MANAGER' && (
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleApproveAct(act.id)}>
                               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                             </Button>
