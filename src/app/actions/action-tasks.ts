@@ -28,11 +28,7 @@ export async function getActionTasks() {
         }
       },
       responsible: true,
-      activities: {
-        include: {
-          responsible: true
-        }
-      }
+      actionPlan: true 
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -40,22 +36,27 @@ export async function getActionTasks() {
   return tasks;
 }
 
-export async function updateTaskAnalysis(taskId: string, rca: string, responsibleId: string) {
+export async function updateTaskAnalysis(taskId: string, rca: string, cause?: string) {
   const session = await getSession();
   if (!session || (session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'MANAGER')) {
     return { error: 'Unauthorized: Only Coordinators or Managers can perform analysis' };
   }
 
   try {
+    const data: any = {
+      rootCauseAnalysis: rca,
+      status: 'REVISADA'
+    };
+
+    if (cause) {
+      data.cause = cause;
+    }
+
     const task = await prisma.actionTask.update({
       where: { id: taskId },
-      data: {
-        rootCauseAnalysis: rca,
-        responsibleId: responsibleId,
-        status: 'REVISADA'
-      }
+      data
     });
-    revalidatePath('/action-plans');
+    revalidatePath('/variation-analysis');
     return { success: true, task };
   } catch (error) {
     console.error('Error updating task analysis:', error);
@@ -63,140 +64,24 @@ export async function updateTaskAnalysis(taskId: string, rca: string, responsibl
   }
 }
 
-
-
-export async function updateTaskCause(taskId: string, newCause: string) {
-  const session = await getSession();
-  if (!session || (session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'MANAGER')) {
-    return { error: 'Unauthorized: Only Coordinators or Managers can update the cause' };
-  }
-
-  try {
-    const task = await prisma.actionTask.update({
-      where: { id: taskId },
-      data: {
-        cause: newCause,
-      }
-    });
-    revalidatePath('/action-plans');
-    return { success: true, task };
-  } catch (error) {
-    console.error('Error updating task cause:', error);
-    return { error: 'Failed to update cause' };
-  }
-}
-
-
-export async function approveActionPlan(taskId: string) {
-  const session = await getSession();
-  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
-    return { error: 'Unauthorized: Only Managers can approve action plans' };
-  }
-
-  try {
-    const task = await prisma.actionTask.update({
-      where: { id: taskId },
-      data: {
-        status: 'EN_PLAN_DE_ACCION'
-      }
-    });
-    revalidatePath('/action-plans');
-    return { success: true, task };
-  } catch (error) {
-    console.error('Error approving action plan:', error);
-    return { error: 'Failed to approve plan' };
-  }
-}
-
 export async function revokeActionPlan(taskId: string) {
   const session = await getSession();
-  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
-    return { error: 'Unauthorized: Only Managers can revoke action plans' };
+  if (!session || (session.role?.toUpperCase() !== 'MANAGER' && session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'ADMIN')) {
+    return { error: 'Unauthorized: Only Managers, Coordinators, or Admins can revoke action plans' };
   }
 
   try {
     const task = await prisma.actionTask.update({
       where: { id: taskId },
       data: {
-        status: 'POR_REVISAR'
+        status: 'POR_REVISAR',
+        actionPlanId: null
       }
     });
-    revalidatePath('/action-plans');
+    revalidatePath('/variation-analysis');
     return { success: true, task };
   } catch (error) {
     console.error('Error revoking action plan:', error);
     return { error: 'Failed to revoke plan' };
-  }
-}
-
-export async function createActivity(taskId: string, data: { description: string, deadline: string, responsibleId: string }) {
-  const session = await getSession();
-  if (!session) return { error: 'Unauthorized' };
-
-  try {
-    const activity = await prisma.actionTaskActivity.create({
-      data: {
-        taskId,
-        description: data.description,
-        deadline: new Date(data.deadline),
-        responsibleId: data.responsibleId,
-        status: 'PENDIENTE'
-      }
-    });
-    revalidatePath('/action-plans');
-    return { success: true, activity };
-  } catch (error) {
-    console.error('Error creating activity:', error);
-    return { error: 'Failed to create activity' };
-  }
-}
-
-export async function updateActivityStatus(activityId: string, status: string) {
-  const session = await getSession();
-  if (!session) return { error: 'Unauthorized' };
-
-  try {
-    const activity = await prisma.actionTaskActivity.update({
-      where: { id: activityId },
-      data: { status }
-    });
-    revalidatePath('/action-plans');
-    return { success: true, activity };
-  } catch (error) {
-    console.error('Error updating activity:', error);
-    return { error: 'Failed to update activity' };
-  }
-}
-
-export async function approveActivity(activityId: string) {
-  const session = await getSession();
-  if (!session || session.role?.toUpperCase() !== 'MANAGER') {
-    return { error: 'Unauthorized: Only Managers can finalize activities' };
-  }
-
-  try {
-    const activity = await prisma.actionTaskActivity.update({
-      where: { id: activityId },
-      data: { status: 'FINALIZADA' }
-    });
-
-    // Check if all activities in the task are finalized
-    const updatedActivity = await prisma.actionTaskActivity.findUnique({
-      where: { id: activityId },
-      include: { task: { include: { activities: true } } }
-    });
-
-    if (updatedActivity?.task.activities.every(a => a.status === 'FINALIZADA')) {
-      await prisma.actionTask.update({
-        where: { id: updatedActivity.taskId },
-        data: { status: 'FINALIZADA' }
-      });
-    }
-
-    revalidatePath('/action-plans');
-    return { success: true, activity };
-  } catch (error) {
-    console.error('Error approving activity:', error);
-    return { error: 'Failed to approve activity' };
   }
 }

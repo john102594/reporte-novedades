@@ -19,7 +19,7 @@ export default async function RootLayout({
   const session = await getSession();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen bg-background flex`} suppressHydrationWarning={true}>
         {session && <Sidebar user={session} />}
         <main className={`flex-1 max-h-screen overflow-y-auto ${session ? 'p-8' : ''} relative`}>

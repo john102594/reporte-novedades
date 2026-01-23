@@ -35,27 +35,6 @@ export async function submitDeviationReport(formData: FormData) {
       },
     });
 
-    // Also update OT status back to VALIDATION_REQUIRED or just leave it OPEN so they can close it?
-    // Actually, createActionPlan logic happens here or later?
-    // For now, just save the record.
-    
-    // Logic: Checking if we should auto-assign action plan?
-    // Plan: "Coordinator's Smart Dashboard... Auto-Assigner".
-    // So we just save the record. The coordinator will see it.
-    // Or maybe we create a skeleton ActionPlan here?
-    
-    // Create Action Plan stub
-    /*
-    await prisma.actionPlan.create({
-        data: {
-            variationId: ...
-            responsibleId: ... (Need logic)
-            status: 'PENDING',
-            description: `Auto-generated from ${event}`
-        }
-    })
-    */
-
   } catch (error) {
     return { error: 'Failed to submit report' };
   }

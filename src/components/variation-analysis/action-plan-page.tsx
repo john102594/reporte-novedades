@@ -19,13 +19,16 @@ interface ActionTask {
   createdAt: Date;
   responsibleId: string | null;
   responsible: { name: string | null } | null;
+  actionPlanId: string | null;
+  actionPlan?: { id: string; name: string } | null;
   activities: any[];
 }
 
-export default function ActionPlanPage({ currentUser, users, causes }: { 
+export default function ActionPlanPage({ currentUser, users, causes, openPlans }: { 
   currentUser: { id: string; role: string } | null, 
   users: { id: string; name: string | null; role: string }[], 
-  causes: { id: string; name: string }[] 
+  causes: { id: string; name: string }[],
+  openPlans: { id: string; name: string }[]
 }) {
   const [tasks, setTasks] = useState<ActionTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,6 +173,7 @@ export default function ActionPlanPage({ currentUser, users, causes }: {
                       currentUser={currentUser} 
                       users={users} 
                       causes={causes}
+                      openPlans={openPlans}
                       onUpdate={() => fetchTasks(false)} 
                     />
                   </TableCell>

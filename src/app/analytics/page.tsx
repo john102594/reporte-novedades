@@ -1,26 +1,36 @@
 import prisma from '@/lib/prisma';
 import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress'; // Need to make sure this exists or just use div
 import { BarChart3, PieChart, AlertOctagon, CheckSquare } from 'lucide-react';
 
 export default async function AnalyticsPage() {
   const plans = await prisma.actionPlan.findMany({
-    include: { variation: true }
+    include: { 
+      tasks: {
+        include: { variation: true }
+      }
+    }
   });
 
   const total = plans.length;
-  const done = plans.filter(p => p.status === 'DONE').length;
-  const pending = plans.filter(p => p.status === 'PENDING').length;
-  const inProgress = plans.filter(p => p.status === 'IN_PROGRESS').length;
-
-  const systemic = plans.filter(p => p.variation.failureType === 'SYSTEMIC').length;
-  const usage = plans.filter(p => p.variation.failureType === 'USAGE').length;
+  // Status check needs to align with new status values (ABIERTO, CERRADO) or legacy?
+  // Schema says: default("ABIERTO") // ABIERTO, CERRADO
+  // Old code used: DONE, PENDING, IN_PROGRESS. I should map them or update logic.
+  // New ActionPlan status: "ABIERTO", "CERRADO". "PlanActivity" has PENDING, EN_PROCESO, FINALIZADA.
+  // I'll map CERRADO to done, ABIERTO to pending/inProgress.
+  
+  const done = plans.filter(p => p.status === 'CERRADO').length;
+  const open = plans.filter(p => p.status === 'ABIERTO').length;
+  
+  // Logic for Systemic/Usage is temporarily unavailable as new schema uses ShiftReportVariation which lacks this field.
+  // We will check if we can derive it or just set to 0 for now.
+  const systemic = 0; 
+  const usage = 0;
   
   const completionRate = total > 0 ? (done / total) * 100 : 0;
   
   // Calculate overdue
   const now = new Date();
-  const overdue = plans.filter(p => p.deadline && p.deadline < now && p.status !== 'DONE').length;
+  const overdue = plans.filter(p => p.endDate && p.endDate < now && p.status !== 'CERRADO').length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -34,7 +44,7 @@ export default async function AnalyticsPage() {
         <KPI title="Completion Rate" value={`${completionRate.toFixed(0)}%`} icon={CheckSquare} color="text-emerald-400" />
         <KPI title="Total Plans" value={total} icon={BarChart3} color="text-blue-400" />
         <KPI title="Overdue Actions" value={overdue} icon={AlertOctagon} color="text-red-400" />
-        <KPI title="Systemic Failures" value={systemic} icon={PieChart} color="text-purple-400" />
+        <KPI title="Active Plans" value={open} icon={PieChart} color="text-purple-400" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -42,34 +52,14 @@ export default async function AnalyticsPage() {
         <Card className="p-6 bg-card/40 backdrop-blur border-border">
             <h3 className="text-lg font-semibold text-white mb-6">Plan Status Distribution</h3>
             <div className="space-y-6">
-                <MetricBar label="Done" value={done} total={total} color="bg-emerald-500" />
-                <MetricBar label="In Progress" value={inProgress} total={total} color="bg-blue-500" />
-                <MetricBar label="Pending" value={pending} total={total} color="bg-orange-500" />
+                <MetricBar label="Closed" value={done} total={total} color="bg-emerald-500" />
+                <MetricBar label="Open" value={open} total={total} color="bg-blue-500" />
             </div>
         </Card>
 
-        {/* Feature vs Usage */}
-        <Card className="p-6 bg-card/40 backdrop-blur border-border">
-            <h3 className="text-lg font-semibold text-white mb-6">Failure Type Analysis</h3>
-            <div className="flex items-center justify-center gap-8 h-[200px]">
-                {/* Simple Visualization */}
-                <div className="text-center">
-                    <div className="text-4xl font-bold text-purple-400">{systemic}</div>
-                    <div className="text-sm text-muted-foreground">Systemic</div>
-                    <div className="text-xs text-gray-500">(Process/Machine)</div>
-                </div>
-                <div className="h-full w-px bg-border"></div>
-                <div className="text-center">
-                    <div className="text-4xl font-bold text-blue-400">{usage}</div>
-                    <div className="text-sm text-muted-foreground">Usage</div>
-                    <div className="text-xs text-gray-500">(Operator Error)</div>
-                </div>
-            </div>
-            <p className="text-center text-sm text-gray-400 mt-4">
-                {systemic > usage 
-                    ? "Focus maintenance and engineering needed." 
-                    : "Focus on operator training needed."}
-            </p>
+        {/* Feature vs Usage - Placeholder/Stubbed */}
+        <Card className="p-6 bg-card/40 backdrop-blur border-border flex items-center justify-center">
+            <p className="text-muted-foreground italic">Failure Type Analysis temporarily unavailable due to schema update.</p>
         </Card>
       </div>
     </div>

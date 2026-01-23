@@ -4,8 +4,8 @@ import { KanbanBoard } from '@/components/kanban/board';
 export default async function KanbanPage() {
   const plans = await prisma.actionPlan.findMany({
     include: {
-      responsible: { select: { name: true } },
-      variation: { select: { event: true, failureType: true } }
+      user: { select: { name: true } },
+      tasks: { select: { cause: true } }
     },
     orderBy: { updatedAt: 'desc' }
   });

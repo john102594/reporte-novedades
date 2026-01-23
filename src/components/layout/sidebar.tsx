@@ -51,6 +51,11 @@ const menuItems = [
     icon: BarChart3,
   },
   {
+    title: 'Variation Analysis',
+    href: '/variation-analysis',
+    icon: AlertTriangle,
+  },
+  {
     title: 'Action Plans',
     href: '/action-plans',
     icon: CheckCircle2,
