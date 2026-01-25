@@ -35,7 +35,7 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Strategic Analytics</h1>
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent mb-2">Strategic Analytics</h1>
         <p className="text-muted-foreground">Insights into production stability and action plan effectiveness.</p>
       </div>
 
@@ -50,7 +50,7 @@ export default async function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Progress Bars */}
         <Card className="p-6 bg-card/40 backdrop-blur border-border">
-            <h3 className="text-lg font-semibold text-white mb-6">Plan Status Distribution</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-6">Plan Status Distribution</h3>
             <div className="space-y-6">
                 <MetricBar label="Closed" value={done} total={total} color="bg-emerald-500" />
                 <MetricBar label="Open" value={open} total={total} color="bg-blue-500" />
@@ -72,9 +72,9 @@ function KPI({ title, value, icon: Icon, color }: { title: string, value: string
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                    <p className="text-2xl font-bold text-white">{value}</p>
+                    <p className="text-2xl font-bold text-foreground">{value}</p>
                 </div>
-                <div className={`p-3 rounded-xl bg-white/5 ${color}`}>
+                <div className={`p-3 rounded-xl bg-accent/20 ${color}`}>
                     <Icon className="w-5 h-5" />
                 </div>
             </div>
@@ -87,7 +87,7 @@ function MetricBar({ label, value, total, color }: { label: string, value: numbe
     return (
         <div className="space-y-1">
             <div className="flex justify-between text-sm">
-                <span className="text-white">{label}</span>
+                <span className="text-foreground">{label}</span>
                 <span className="text-muted-foreground">{value} ({pct.toFixed(0)}%)</span>
             </div>
             <div className="h-2 w-full bg-accent/20 rounded-full overflow-hidden">

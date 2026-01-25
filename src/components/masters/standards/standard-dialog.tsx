@@ -73,7 +73,7 @@ export function StandardDialog({ machines, standardToEdit }: { machines: Machine
       </DialogTrigger>
       <DialogContent className="bg-white dark:bg-zinc-950 border border-border shadow-xl sm:max-w-[425px] z-50">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
             {standardToEdit ? 'Edit Process Standard' : 'Configure Machine Standard'}
           </DialogTitle>
         </DialogHeader>

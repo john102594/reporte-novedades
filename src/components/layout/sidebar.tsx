@@ -18,6 +18,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useState } from 'react';
+import { ModeToggle } from '@/components/mode-toggle';
 
 const menuItems = [
   {
@@ -109,13 +110,16 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Header */}
       <div className="p-4 flex items-center justify-between border-b border-border/50">
         {!collapsed && (
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
             FlexFlow
           </h1>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-accent rounded-lg">
-          <Menu className="w-5 h-5 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+            <ModeToggle />
+            <button onClick={() => setCollapsed(!collapsed)} className="p-2 hover:bg-accent rounded-lg">
+                <Menu className="w-5 h-5 text-muted-foreground" />
+            </button>
+        </div>
       </div>
 
       {/* Navigation */}

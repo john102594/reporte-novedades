@@ -1,10 +1,10 @@
+import React from 'react';
 import prisma from '@/lib/prisma';
 import { ProductionManager } from '@/components/production/production-manager';
-
-export const dynamic = 'force-dynamic';
-
 import { getSession } from '../actions/auth';
 import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ProductionPage() {
   const session = await getSession();

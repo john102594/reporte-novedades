@@ -60,9 +60,9 @@ export function ProgramDialog({ areas, programToEdit }: { areas: Area[], program
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border sm:max-w-[425px]">
+      <DialogContent className="bg-white dark:bg-zinc-950 !opacity-100 shadow-2xl border-border sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
             {programToEdit ? 'Edit Failure Program' : 'Define Failure Program'}
           </DialogTitle>
         </DialogHeader>

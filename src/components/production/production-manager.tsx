@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ProductionTable } from './production-table';
 import { getProductionContext, getShiftReport } from '@/app/actions/production';
-import { Loader2, Calendar, Clock, MapPin, Search } from 'lucide-react';
+import { Loader2, Calendar, Clock, MapPin, Search, Save } from 'lucide-react';
 
 interface Area {
   id: string;
@@ -77,35 +77,61 @@ export function ProductionManager({ areas, userId }: { areas: Area[], userId: st
 
   if (step === 'table' && context) {
     return (
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between bg-card p-4 rounded-lg border shadow-sm">
-            <div className="flex gap-6 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-foreground">
-                        {areas.find(a => a.id === areaId)?.name}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-foreground">
-                        {date}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-foreground">
-                        {shift}
-                    </span>
+      <div className="flex flex-col h-[calc(100vh-2rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Header Redesign */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-zinc-950 border-b shrink-0">
+            <div className="flex items-center gap-6">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-950 via-primary to-purple-600 dark:from-purple-400 dark:via-primary dark:to-purple-300 bg-clip-text text-transparent">
+                    FlexFlow
+                </h1>
+
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">
+                        <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        <span className="text-xs font-bold text-purple-900 dark:text-purple-100 uppercase tracking-wider">
+                            {areas.find(a => a.id === areaId)?.name}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full">
+                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                            {date}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-full">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                            {shift}
+                        </span>
+                    </div>
+
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setStep('selection')}
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors h-8"
+                    >
+                        Change Selection
+                    </Button>
                 </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setStep('selection')}>
-                Change Selection
-            </Button>
+
+            {/* Guardar Jornada Button - Linked to Table via custom ID for simple DOM access or just rely on Table buttons for now */}
+            <div className="flex items-center gap-3">
+                <Button 
+                    id="global-save-button"
+                    className="bg-slate-900 hover:bg-black text-white px-6 font-bold shadow-lg transition-all active:scale-95 flex gap-2"
+                >
+                    <Save className="w-4 h-4" />
+                    Guardar Jornada
+                </Button>
+            </div>
         </div>
 
         {context.machines.length === 0 && (
-            <div className="p-4 bg-red-100 text-red-800 rounded border border-red-300">
+            <div className="m-4 p-4 bg-red-100 text-red-800 rounded border border-red-300">
                 <strong>Error: No machines found for this area.</strong>
                 <p>Please check if the area "Impresion" has machines assigned in the database.</p>
                 <p>Debug ID: {areaId}</p>

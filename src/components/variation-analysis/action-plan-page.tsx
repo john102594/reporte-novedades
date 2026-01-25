@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getActionTasks } from '@/app/actions/action-tasks';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,20 @@ interface ActionTask {
   responsibleId: string | null;
   responsible: { name: string | null } | null;
   actionPlanId: string | null;
-  actionPlan?: { id: string; name: string } | null;
+  actionPlan?: { 
+    id: string; 
+    name: string; 
+    status: string;
+    startDate?: string | Date;
+    activities?: {
+      id: string;
+      description: string;
+      responsibleId: string;
+      startDate: string | Date;
+      deadline: string | Date;
+      responsible?: { name: string | null };
+    }[]
+  } | null;
   activities: any[];
 }
 
@@ -47,7 +60,7 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
     fetchTasks();
   }, []);
 
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = tasks.filter(t => {      
     if (filter === 'ALL') return true;
     return t.status === filter;
   });
@@ -62,12 +75,22 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
     }
   };
 
+  const getPlanStatusBadge = (status?: string) => {
+    if (!status) return null;
+    switch (status) {
+      case 'REVISION': return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">En Revisión</Badge>;
+      case 'ABIERTO': return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Abierto</Badge>;
+      case 'CERRADO': return <Badge variant="outline" className="bg-slate-500/10 text-slate-500 border-slate-500/20">Cerrado</Badge>;
+      default: return null;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-            Planes de Acción
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
+            Analisis de Variaciones
           </h1>
           <p className="text-muted-foreground mt-1 text-sm md:text-base">
             Gestión y seguimiento de variaciones reportadas.
@@ -114,7 +137,7 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
         {[
           { label: 'Total', value: tasks.length, icon: ClipboardList, color: 'text-primary' },
           { label: 'Pendientes', value: tasks.filter(t => t.status === 'POR_REVISAR').length, icon: AlertCircle, color: 'text-red-500' },
-          { label: 'En Proceso', value: tasks.filter(t => t.status === 'EN_PLAN_DE_ACCION').length, icon: Clock, color: 'text-orange-500' },
+          { label: 'En Plan', value: tasks.filter(t => t.status === 'EN_PLAN_DE_ACCION').length, icon: Clock, color: 'text-orange-500' },
           { label: 'Finalizadas', value: tasks.filter(t => t.status === 'FINALIZADA').length, icon: CheckCircle2, color: 'text-emerald-500' },
         ].map((stat, i) => (
           <Card key={i} className="bg-card/50 backdrop-blur-sm border-border">
@@ -140,8 +163,8 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
               <TableRow>
                 <TableHead className="w-[100px]">OT</TableHead>
                 <TableHead>Causa Reportada</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Responsable</TableHead>
+                <TableHead>Estado Tarea</TableHead>
+                <TableHead>Estado Plan</TableHead>
                 <TableHead>Fecha Reporte</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -165,7 +188,7 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(task.status)}</TableCell>
-                  <TableCell>{task.responsible?.name || <span className="text-muted-foreground italic text-xs">Sin asignar</span>}</TableCell>
+                  <TableCell>{getPlanStatusBadge(task.actionPlan?.status)}</TableCell>
                   <TableCell className="text-xs">{new Date(task.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <TaskReviewDialog 

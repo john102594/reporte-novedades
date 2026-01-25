@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -78,7 +78,7 @@ export function SummaryTable({ data }: SummaryTableProps) {
         </TableHeader>
         <TableBody>
           {data.map((row) => (
-            <>
+            <React.Fragment key={row.groupKey}>
               <TableRow key={row.groupKey} className="hover:bg-muted/50 transition-colors">
                 <TableCell>
                   <Button 
@@ -169,7 +169,7 @@ export function SummaryTable({ data }: SummaryTableProps) {
                   </TableCell>
                 </TableRow>
               )}
-            </>
+              </React.Fragment>
           ))}
         </TableBody>
       </Table>

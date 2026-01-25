@@ -28,7 +28,16 @@ export async function getActionTasks() {
         }
       },
       responsible: true,
-      actionPlan: true 
+      actionPlan: {
+        include: {
+          activities: {
+            include: {
+              responsible: true
+            },
+            orderBy: { startDate: 'asc' }
+          }
+        }
+      } 
     },
     orderBy: { createdAt: 'desc' }
   });

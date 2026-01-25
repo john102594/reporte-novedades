@@ -1,3 +1,4 @@
+import React from 'react';
 import prisma from '@/lib/prisma';
 import { OTManager } from '@/components/production/ot-manager';
 import { notFound } from 'next/navigation';

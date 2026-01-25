@@ -6,6 +6,26 @@ import { getSession } from './auth';
 
 // --- Action Plans ---
 
+async function syncPlanDates(tx: any, planId: string, activities?: any[]) {
+    const allActivities = activities || await tx.planActivity.findMany({
+        where: { planId },
+        select: { startDate: true, deadline: true }
+    });
+
+    if (allActivities.length > 0) {
+        const minDate = new Date(Math.min(...allActivities.map((a: any) => new Date(a.startDate).getTime())));
+        const maxDate = new Date(Math.max(...allActivities.map((a: any) => new Date(a.deadline).getTime())));
+
+        await tx.actionPlan.update({
+            where: { id: planId },
+            data: {
+                startDate: minDate,
+                endDate: maxDate
+            }
+        });
+    }
+}
+
 export async function getActionPlans() {
   const session = await getSession();
   if (!session) return { error: 'Unauthorized' };
@@ -32,21 +52,50 @@ export async function getActionPlans() {
   }
 }
 
-export async function createActionPlan(data: { name: string, startDate: string, endDate?: string }) {
+export async function createActionPlan(data: { 
+  name: string, 
+  startDate?: string, 
+  priority?: string,
+  endDate?: string,
+  activities?: {
+    description: string;
+    responsibleId: string;
+    startDate: string;
+    deadline: string;
+  }[]
+}) {
   const session = await getSession();
-  if (!session || (session.role !== 'MANAGER' && session.role !== 'COORDINATOR')) {
+  if (!session || (session.role !== 'MANAGER' && session.role !== 'COORDINATOR' && session.role !== 'ADMIN')) {
     return { error: 'Unauthorized' };
   }
+
+  // Workflow Logic: Coordinator -> REVISION, Manager/Admin -> ABIERTO
+  const initialStatus = session.role === 'COORDINATOR' ? 'REVISION' : 'ABIERTO';
 
   try {
     const plan = await prisma.actionPlan.create({
       data: {
         name: data.name,
-        startDate: new Date(data.startDate),
+        startDate: data.startDate ? new Date(data.startDate) : new Date(),
         endDate: data.endDate ? new Date(data.endDate) : null,
-        status: 'ABIERTO'
+        priority: data.priority || 'MEDIA',
+        status: initialStatus,
+        activities: data.activities && data.activities.length > 0 ? {
+          create: data.activities.map(act => ({
+            description: act.description,
+            responsibleId: act.responsibleId,
+            startDate: new Date(act.startDate),
+            deadline: new Date(act.deadline),
+            status: 'PENDIENTE'
+          }))
+        } : undefined
       }
     });
+    // Recalculate if activities were provided
+    if (data.activities && data.activities.length > 0) {
+      await syncPlanDates(prisma, plan.id, data.activities);
+    }
+
     revalidatePath('/action-plans');
     return { success: true, plan };
   } catch (error) {
@@ -57,7 +106,7 @@ export async function createActionPlan(data: { name: string, startDate: string, 
 
 export async function updateActionPlanStatus(planId: string, status: string) {
     const session = await getSession();
-    if (!session || session.role !== 'MANAGER') {
+    if (!session || (session.role !== 'MANAGER' && session.role !== 'ADMIN')) {
       return { error: 'Unauthorized' };
     }
   
@@ -78,8 +127,26 @@ export async function updateActionPlanStatus(planId: string, status: string) {
 
 export async function createPlanActivity(planId: string, data: { description: string, responsibleId: string, startDate: string, deadline: string }) {
   const session = await getSession();
-  if (!session || (session.role !== 'MANAGER' && session.role !== 'COORDINATOR')) {
+  if (!session || (session.role !== 'MANAGER' && session.role !== 'COORDINATOR' && session.role !== 'ADMIN')) {
     return { error: 'Unauthorized' };
+  }
+
+  // Check Plan Status first
+  const plan = await prisma.actionPlan.findUnique({
+    where: { id: planId },
+    select: { status: true }
+  });
+
+  if (!plan) return { error: 'Plan not found' };
+
+  // Rule: Once approved (ABIERTO), structure cannot be modified (no new activities)
+  // EXCEPT for Managers as per updated requirements.
+  if (plan.status === 'CERRADO') {
+    return { error: 'No se pueden agregar actividades a un plan cerrado.' };
+  }
+
+  if (plan.status === 'ABIERTO' && session.role !== 'MANAGER' && session.role !== 'ADMIN') {
+    return { error: 'No se pueden agregar actividades a un plan aprobado.' };
   }
 
   try {
@@ -93,6 +160,10 @@ export async function createPlanActivity(planId: string, data: { description: st
         status: 'PENDIENTE'
       }
     });
+
+    // Recalculate Plan Dates
+    await syncPlanDates(prisma, planId);
+
     revalidatePath('/action-plans');
     return { success: true, activity };
   } catch (error) {
@@ -101,18 +172,34 @@ export async function createPlanActivity(planId: string, data: { description: st
   }
 }
 
-export async function updatePlanActivityStatus(activityId: string, status: string) {
+export async function updatePlanActivity(activityId: string, data: { status?: string, startDate?: string, deadline?: string, responsibleId?: string }) {
     const session = await getSession();
     if (!session) return { error: 'Unauthorized' };
   
     try {
+      const updateData: any = {};
+      if (data.status) updateData.status = data.status;
+      
+      // Only Managers can update dates and responsible
+      if (data.startDate && (session.role === 'MANAGER' || session.role === 'ADMIN')) {
+          updateData.startDate = new Date(data.startDate);
+      }
+      if (data.deadline && (session.role === 'MANAGER' || session.role === 'ADMIN')) {
+          updateData.deadline = new Date(data.deadline);
+      }
+      if (data.responsibleId && (session.role === 'MANAGER' || session.role === 'ADMIN')) {
+          updateData.responsibleId = data.responsibleId;
+      }
+
       const activity = await prisma.planActivity.update({
         where: { id: activityId },
-        data: { status }
+        data: updateData
       });
 
-      // Check if we should close the plan? (Optional per requirement, but good practice)
-      // For now, just update activity.
+      // Recalculate if dates changed
+      if (data.startDate || data.deadline) {
+          await syncPlanDates(prisma, activity.planId);
+      }
       
       revalidatePath('/action-plans');
       return { success: true, activity };
@@ -120,6 +207,85 @@ export async function updatePlanActivityStatus(activityId: string, status: strin
       console.error('Error updating activity:', error);
       return { error: 'Failed to update activity' };
     }
+}
+
+export async function updateActionPlan(planId: string, data: {
+  name?: string,
+  startDate?: string,
+  priority?: string,
+  status?: string,
+  activities?: {
+    description: string;
+    responsibleId: string;
+    startDate: string;
+    deadline: string;
+  }[]
+}) {
+  const session = await getSession();
+  if (!session || (session.role !== 'MANAGER' && session.role !== 'ADMIN' && session.role !== 'COORDINATOR')) {
+    return { error: 'Unauthorized' };
+  }
+
+  try {
+    const updateData: any = {};
+    if (data.name) updateData.name = data.name;
+    if (data.startDate) updateData.startDate = new Date(data.startDate);
+    if (data.priority) updateData.priority = data.priority;
+    if (data.status) updateData.status = data.status;
+
+    // Use a transaction to ensure atomicity
+    const plan = await prisma.$transaction(async (tx) => {
+      // 1. Update Plan Basic Info
+      const updatedPlan = await tx.actionPlan.update({
+        where: { id: planId },
+        data: updateData
+      });
+
+      // 2. Update Activities if provided (Delete and Re-create for simplicity in sync with UI state)
+      if (data.activities) {
+        // Delete existing activities
+        await tx.planActivity.deleteMany({
+          where: { planId }
+        });
+
+        // Create new ones
+        if (data.activities.length > 0) {
+          await tx.planActivity.createMany({
+            data: data.activities.map(act => ({
+              planId,
+              description: act.description,
+              responsibleId: act.responsibleId,
+              startDate: new Date(act.startDate),
+              deadline: new Date(act.deadline),
+              status: 'PENDIENTE'
+            }))
+          });
+        }
+      }
+
+      // 3. If plan is being approved (ABIERTO), update all associated ActionTasks to EN_PLAN_DE_ACCION
+      if (data.status === 'ABIERTO') {
+        await tx.actionTask.updateMany({
+          where: { actionPlanId: planId },
+          data: { status: 'EN_PLAN_DE_ACCION' }
+        });
+      }
+
+      // 4. Recalculate Dates if activities were synced
+      if (data.activities && data.activities.length > 0) {
+        await syncPlanDates(tx, planId, data.activities);
+      }
+
+      return updatedPlan;
+    });
+
+    revalidatePath('/action-plans');
+    revalidatePath('/variation-analysis');
+    return { success: true, plan };
+  } catch (error) {
+    console.error('Error updating action plan:', error);
+    return { error: 'Failed to update plan' };
+  }
 }
 export async function assignTaskToPlan(taskId: string, planId: string) {
   const session = await getSession();

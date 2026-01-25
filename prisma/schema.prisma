@@ -240,6 +240,7 @@ model ActionPlan {
   name        String
   description String?
   status      String    @default("ABIERTO") // ABIERTO, CERRADO
+  priority    String    @default("MEDIA") // BAJA, MEDIA, ALTA
   startDate   DateTime
   endDate     DateTime?
 

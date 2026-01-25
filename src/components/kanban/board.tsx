@@ -37,7 +37,7 @@ function Column({ title, items, color, badge }: { title: string, items: ActionPl
     return (
         <div className={`bg-card/20 rounded-xl p-4 border ${color} flex flex-col gap-4`}>
             <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-white">{title}</h3>
+                <h3 className="font-semibold text-foreground bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">{title}</h3>
                 <Badge variant="secondary" className={badge}>{items.length}</Badge>
             </div>
             
@@ -70,7 +70,7 @@ function KanbanCard({ item }: { item: ActionPlan }) {
                 )}
             </div>
             
-            <h4 className="font-bold text-white mb-1">{item.name}</h4>
+            <h4 className="font-bold text-foreground mb-1">{item.name}</h4>
             <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
                 {item.description}
             </p>
@@ -78,7 +78,7 @@ function KanbanCard({ item }: { item: ActionPlan }) {
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
                 <div className="flex items-center gap-2">
                     <Avatar className="w-6 h-6 border border-border">
-                        <AvatarFallback className="text-[10px] bg-accent text-white">
+                        <AvatarFallback className="text-[10px] bg-accent text-foreground">
                             {item.user?.name?.substring(0,2).toUpperCase() || '??'}
                         </AvatarFallback>
                     </Avatar>

@@ -72,7 +72,7 @@ export function UserDialog({ userToEdit, areas = [] }: { userToEdit?: User, area
       </DialogTrigger>
       <DialogContent className="bg-white dark:bg-zinc-950 border-border shadow-xl sm:max-w-[500px] z-50 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
             {userToEdit ? 'Edit User' : 'Create User'}
           </DialogTitle>
         </DialogHeader>

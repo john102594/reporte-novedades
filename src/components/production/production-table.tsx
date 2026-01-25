@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -162,7 +162,9 @@ export function ProductionTable({
     setItems(prev => prev.map(item => {
       if (item.machineId !== machineId) return item;
       const newDetails = [...item.details];
-      newDetails[detailIndex] = { ...newDetails[detailIndex], [field]: value };
+      const updatedDetail = { ...newDetails[detailIndex], [field]: value };
+      
+      newDetails[detailIndex] = updatedDetail;
       return { ...item, details: newDetails };
     }));
   };
@@ -268,6 +270,16 @@ export function ProductionTable({
     }
   };
 
+  // Connect Global Save Button from Manager Header
+  useEffect(() => {
+    const btn = document.getElementById('global-save-button');
+    if (btn) {
+        const handleClick = () => handleSave();
+        btn.addEventListener('click', handleClick);
+        return () => btn.removeEventListener('click', handleClick);
+    }
+  }, [items, reportId]); // Re-bind when state changes to capture current items in closure or use a ref
+
   // Auto-save effect (debounce?)
   // For now, let's rely on manual Save or Close, maybe auto-save every 30s.
 
@@ -279,48 +291,59 @@ export function ProductionTable({
     return ((desp / prod) * 100).toFixed(1) + '%';
   };
 
+  // --- Totals for Footer ---
+  const totals = items.reduce((acc, item) => {
+    item.details.forEach(detail => {
+        const prodMetros = parseFloat(detail.mtProd as string) || 0;
+        const efficiencyValue = parseFloat(detail.efficiency as string) || 0;
+        
+        acc.progMetros += parseFloat(detail.mtProg as string) || 0;
+        acc.prodMetros += prodMetros;
+        acc.prodKg += parseFloat(detail.kgProd as string) || 0;
+        acc.despKg += parseFloat(detail.kgDesp as string) || 0;
+        
+        // Weighted Efficiency: Sum(Efic * Prod)
+        acc.weightedEficSum += (efficiencyValue * prodMetros);
+        acc.count++;
+    });
+    return acc;
+  }, { progMetros: 0, prodMetros: 0, prodKg: 0, despKg: 0, weightedEficSum: 0, count: 0 });
+
+  // Weighted Avg = Sum(Efic * Prod) / Sum(Prod)
+  const globalEfficiency = (totals.prodMetros > 0 ? (totals.weightedEficSum / totals.prodMetros) : 0).toFixed(1);
+  const globalDesp = (totals.prodKg > 0 ? (totals.despKg / totals.prodKg) * 100 : 0).toFixed(1);
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col flex-1 overflow-hidden relative">
       {readOnly && (
-        <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-4 rounded-md flex items-center gap-2">
-            <XCircle className="w-5 h-5" />
-            <div>
-                <strong>Read Only Mode</strong>
-                <p className="text-sm">This report belongs to manager <strong>{ownerName}</strong>. You can only view it.</p>
-            </div>
+        <div className="mx-6 my-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-lg flex items-center gap-2 text-xs">
+            <XCircle className="w-4 h-4" />
+            <span><strong>Modo Lectura:</strong> Este reporte pertenece a <strong>{ownerName}</strong>.</span>
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
-        <Button onClick={handleSave} disabled={isSaving || readOnly} variant="outline" className="gap-2">
-            <Save className="w-4 h-4" />
-            {isSaving ? 'Saving...' : 'Save Draft'}
-        </Button>
-        <Button onClick={handleCloseShift} disabled={readOnly} variant="destructive" className="gap-2">
-            <XCircle className="w-4 h-4" />
-            Close Shift
-        </Button>
+      {/* Hidden legacy buttons, we use the header one now or can keep them for safety */}
+      <div className="hidden">
+        <Button id="legacy-save-btn" onClick={handleSave} disabled={isSaving || readOnly} />
+        <Button id="legacy-close-btn" onClick={handleCloseShift} disabled={readOnly} />
       </div>
 
-      <div className="border rounded-lg overflow-x-auto bg-card">
-        <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
-                <tr>
-                    <th className="p-2 border w-[120px]">Machine</th>
-                    <th className="p-2 border w-[160px]">Operator</th>
-                    <th className="p-2 border w-[140px]">OT</th>
-                    <th className="p-2 border w-[80px]">Efficiency</th>
-                    <th className="p-2 border w-[120px]">MT PROG</th>
-                    <th className="p-2 border w-[120px]">MT PROD</th>
-                    <th className="p-2 border w-[80px]">KG PROD</th>
-                    <th className="p-2 border w-[80px]">KG DESP</th>
-                    <th className="p-2 border w-[70px]">% Desp</th>
-                    <th className="p-2 border w-[120px]">Variations</th>
-                    <th className="p-2 border w-[160px]">Cause</th>
-                    <th className="p-2 border min-w-[250px]">Analysis</th>
+      {/* Main Table Container */}
+      <div className="flex-1 overflow-auto px-6 pb-24">
+        <table className="w-full text-[11px] border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20 bg-white dark:bg-zinc-950">
+                <tr className="text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider h-12">
+                    <th className="px-4 text-left border-b w-[240px]">Máquina / Operador</th>
+                    <th className="px-2 text-center border-b w-[100px]">Orden</th>
+                    <th className="px-2 text-center border-b w-[80px]">Eficiencia</th>
+                    <th className="px-2 text-center border-b w-[180px]">Metros</th>
+                    <th className="px-2 text-center border-b w-[180px]">Kilogramos</th>
+                    <th className="px-1 text-center border-b w-[60px]">% Desp</th>
+                    <th className="px-2 text-center border-b w-[100px]">Variación</th>
+                    <th className="px-4 text-left border-b">Análisis y Causa</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {items.map((item) => {
                     const machine = machines.find(m => m.id === item.machineId);
                     const machineOperators = machine?.operators && machine.operators.length > 0 
@@ -349,12 +372,92 @@ export function ProductionTable({
             </tbody>
         </table>
       </div>
+
+      {/* FIXED FOOTER SUMMARY BAR */}
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f172a] text-white flex items-center justify-between px-12 z-50 border-t border-slate-800 shadow-2xl">
+          <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Planta Operativa</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Máquinas</span>
+                  <span className="text-xl font-black text-white">{machines.length}</span>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-12">
+              <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none">Total Metros</span>
+                  <div className="flex items-baseline gap-1">
+                      <span className="text-lg font-black">{totals.prodMetros.toLocaleString()}</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">mt</span>
+                  </div>
+              </div>
+
+              <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none">Total Kg Prod.</span>
+                  <div className="flex items-baseline gap-1">
+                      <span className="text-lg font-black">{totals.prodKg.toLocaleString()}</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">kg</span>
+                  </div>
+              </div>
+
+              <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest leading-none">Total Kg Desp.</span>
+                  <div className="flex items-baseline gap-1 text-amber-500">
+                      <span className="text-lg font-black">{totals.despKg.toLocaleString()}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">kg</span>
+                  </div>
+              </div>
+
+              <div className="h-8 w-px bg-slate-800" />
+
+              <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest leading-none">% Desp. Total</span>
+                  <span className="text-xl font-black text-white">{globalDesp}%</span>
+              </div>
+
+              <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none flex items-center gap-1">
+                      <Plus className="w-2 h-2 rotate-45" /> Eficiencia Global
+                  </span>
+                  <span className="text-2xl font-black text-white tracking-tight">{globalEfficiency}%</span>
+              </div>
+          </div>
+      </div>
     </div>
   );
 }
 
+// Local optimized input to avoid global re-renders on every keystroke
+function DebouncedInput({ value: initialValue, onChange, delay = 300, ...props }: any) {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (value !== initialValue) {
+        onChange(value);
+      }
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value]);
+
+  return (
+    <Input
+      {...props}
+      value={value}
+      onChange={e => setValue(e.target.value)}
+    />
+  );
+}
+
 // Sub-component for rendering the complex row structure
-function MachineRow({ 
+const MachineRow = React.memo(function MachineRow({ 
     item, 
     machineName, 
     operators, 
@@ -369,176 +472,220 @@ function MachineRow({
     calculatePerecentDesp,
     readOnly
 }: any) {
-    // We need to calculate how many rows this machine takes up.
-    // It is the sum of variations for all details.
     const totalRows = item.details.reduce((acc: number, d: any) => acc + Math.max(d.variations.length, 1), 0);
+    const machineIdDisplay = machineName.replace(/\D/g, '') || machineName.charAt(0);
 
     return (
-        <>
+        <React.Fragment key={item.machineId}>
             {item.details.map((detail: any, dIndex: number) => {
                 const variationRows = Math.max(detail.variations.length, 1);
                 
                 return detail.variations.map((variation: any, vIndex: number) => (
-                    <tr key={`${item.machineId}-${dIndex}-${vIndex}`} className="border-b hover:bg-muted/20">
-                        {/* Machine & Operator: Render only on first row of first detail */}
+                    <tr key={`${item.machineId}-${dIndex}-${vIndex}`} className="group hover:bg-slate-50/50 dark:hover:bg-zinc-900 transition-colors">
+                        {/* Machine & Operator Section */}
                         {dIndex === 0 && vIndex === 0 && (
-                            <>
-                                <td rowSpan={totalRows} className="p-2 border font-medium align-top bg-muted/5">
-                                    {machineName}
-                                </td>
-                                <td rowSpan={totalRows} className="p-2 border align-top bg-muted/5">
-                                    <Select 
-                                        value={item.operatorId} 
-                                        onValueChange={(v) => onOperatorChange(item.machineId, v)}
-                                        disabled={readOnly}
-                                    >
-                                        <SelectTrigger className="w-[140px] h-8">
-                                            <SelectValue placeholder="Select..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="UNPROGRAMMED" className="text-muted-foreground font-semibold">
-                                                Desprogramada
-                                            </SelectItem>
-                                            {operators.map((op: any) => (
-                                                <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </td>
-                            </>
+                            <td rowSpan={totalRows} className="p-4 border-b border-slate-100 dark:border-slate-800 align-top">
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                                            <span className="text-xs font-black text-primary">{machineIdDisplay}</span>
+                                        </div>
+                                        <span className="font-bold text-slate-800 dark:text-slate-100">{machineName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 group/op">
+                                        <Select 
+                                            value={item.operatorId} 
+                                            onValueChange={(v) => onOperatorChange(item.machineId, v)}
+                                            disabled={readOnly}
+                                        >
+                                            <SelectTrigger className="w-full h-8 text-[10px] font-bold uppercase tracking-widest bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/op:bg-primary transition-colors" />
+                                                    <SelectValue placeholder="OPERADOR" />
+                                                </div>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="UNPROGRAMMED">DESPROGRAMADA</SelectItem>
+                                                {operators.map((op: any) => (
+                                                    <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </td>
                         )}
 
-                        {/* Detail Columns: Render only on first row of the detail */}
+                        {/* Order Detail Section */}
                         {vIndex === 0 && (
                             <>
-                                <td rowSpan={variationRows} className="p-2 border align-top min-w-[120px] max-w-[120px]">
-                                    <div className="flex flex-col gap-1">
-                                        <Input 
+                                <td rowSpan={variationRows} className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-middle">
+                                    <div className="flex flex-col items-center gap-1.5">
+                                        <DebouncedInput 
                                             value={detail.ot} 
-                                            onChange={(e) => onDetailChange(item.machineId, dIndex, 'ot', e.target.value)}
+                                            onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'ot', val)}
                                             placeholder="OT #" 
-                                            className="h-8"
+                                            className="h-8 text-center font-bold text-primary bg-purple-50/50 dark:bg-purple-900/10 border-purple-100 dark:border-purple-800"
                                             disabled={readOnly}
                                         />
-                                        <div className="flex gap-1">
-                                            <Button disabled={readOnly} variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddDetail(item.machineId)}>
-                                                <Plus className="w-3 h-3" />
-                                            </Button>
-                                            {item.details.length > 1 && (
-                                                <Button disabled={readOnly} variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onRemoveDetail(item.machineId, dIndex)}>
-                                                    <Trash2 className="w-3 h-3" />
-                                                </Button>
-                                            )}
+                                        {!readOnly && (
+                                            <div className="flex gap-1">
+                                                <button onClick={() => onAddDetail(item.machineId)} className="p-1 text-slate-300 hover:text-primary transition-colors">
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                </button>
+                                                {item.details.length > 1 && (
+                                                    <button onClick={() => onRemoveDetail(item.machineId, dIndex)} className="p-1 text-slate-300 hover:text-destructive transition-colors">
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
+                                
+                                <td rowSpan={variationRows} className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-middle text-center">
+                                    <div className="inline-flex flex-col items-center">
+                                        <DebouncedInput 
+                                            value={detail.efficiency} 
+                                            onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'efficiency', val)}
+                                            className={`h-8 w-16 text-center font-black border-none bg-transparent shadow-none focus-visible:ring-0 ${
+                                                parseFloat(detail.efficiency) > 92 
+                                                    ? 'text-emerald-500' 
+                                                    : parseFloat(detail.efficiency) >= 80 
+                                                        ? 'text-amber-500' 
+                                                        : 'text-rose-500'
+                                            }`}
+                                            disabled={readOnly}
+                                        />
+                                        <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-[-4px] block">%</span>
+                                    </div>
+                                </td>
+
+                                <td rowSpan={variationRows} className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-middle">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Programado</span>
+                                            <DebouncedInput 
+                                                value={detail.mtProg} 
+                                                onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'mtProg', val)}
+                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Producido</span>
+                                            <DebouncedInput 
+                                                value={detail.mtProd} 
+                                                onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'mtProd', val)}
+                                                className="h-8 text-xs font-black bg-purple-50/30 dark:bg-purple-900/5 text-center border-primary/20"
+                                                disabled={readOnly}
+                                            />
                                         </div>
                                     </div>
                                 </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top">
-                                    <Input 
-                                        value={detail.efficiency} 
-                                        onChange={(e) => onDetailChange(item.machineId, dIndex, 'efficiency', e.target.value)}
-                                        className="w-16 h-8" 
-                                        placeholder="%"
-                                        disabled={readOnly}
-                                    />
+
+                                <td rowSpan={variationRows} className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-middle">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Producido</span>
+                                            <DebouncedInput 
+                                                value={detail.kgProd} 
+                                                onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'kgProd', val)}
+                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <span className="text-[8px] font-bold text-rose-400 uppercase tracking-[0.1em] block">Desperdicio</span>
+                                            <DebouncedInput 
+                                                value={detail.kgDesp} 
+                                                onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'kgDesp', val)}
+                                                className="h-8 text-xs font-bold bg-rose-50/30 dark:bg-rose-900/5 text-center border-rose-100 dark:border-rose-900/50 text-rose-600"
+                                                disabled={readOnly}
+                                            />
+                                        </div>
+                                    </div>
                                 </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top">
-                                    <Input 
-                                        value={detail.mtProg} 
-                                        onChange={(e) => onDetailChange(item.machineId, dIndex, 'mtProg', e.target.value)}
-                                        className="w-full h-8"
-                                        disabled={readOnly}
-                                    />
-                                </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top">
-                                    <Input 
-                                        value={detail.mtProd} 
-                                        onChange={(e) => onDetailChange(item.machineId, dIndex, 'mtProd', e.target.value)}
-                                        className="w-full h-8"
-                                        disabled={readOnly}
-                                    />
-                                </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top">
-                                    <Input 
-                                        value={detail.kgProd} 
-                                        onChange={(e) => onDetailChange(item.machineId, dIndex, 'kgProd', e.target.value)}
-                                        className="w-16 h-8"
-                                        disabled={readOnly}
-                                    />
-                                </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top">
-                                    <Input 
-                                        value={detail.kgDesp} 
-                                        onChange={(e) => onDetailChange(item.machineId, dIndex, 'kgDesp', e.target.value)}
-                                        className="w-16 h-8"
-                                        disabled={readOnly}
-                                    />
-                                </td>
-                                <td rowSpan={variationRows} className="p-2 border align-top font-medium">
-                                    {calculatePerecentDesp(detail.kgProd, detail.kgDesp)}
+
+                                <td rowSpan={variationRows} className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-middle text-center">
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-black text-slate-700 dark:text-slate-200">
+                                            {calculatePerecentDesp(detail.kgProd, detail.kgDesp)}
+                                        </span>
+                                    </div>
                                 </td>
                             </>
                         )}
 
-                        {/* Variation Columns */}
-                        <td className="p-2 border align-top">
-                            <Select 
-                                value={variation.stage || ''} 
-                                onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'stage', v === '_CLEAR_' ? '' : v)}
-                                disabled={readOnly}
-                            >
-                                <SelectTrigger className="w-[100px] h-8">
-                                    <SelectValue placeholder="Stage" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="_CLEAR_">-- Vacío --</SelectItem>
-                                    <SelectItem value="T1">T1</SelectItem>
-                                    <SelectItem value="T2">T2</SelectItem>
-                                    <SelectItem value="T3">T3</SelectItem>
-                                    <SelectItem value="T4">T4</SelectItem>
-                                    <SelectItem value="T5">T5</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div className="flex gap-1 mt-1">
-                                {vIndex === detail.variations.length - 1 && (
-                                     <Button disabled={readOnly} variant="ghost" size="icon" className="h-5 w-5" onClick={() => onAddVariation(item.machineId, dIndex)}>
-                                        <Plus className="w-3 h-3" />
-                                    </Button>
-                                )}
-                                {detail.variations.length > 1 && (
-                                     <Button disabled={readOnly} variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => onRemoveVariation(item.machineId, dIndex, vIndex)}>
-                                        <Trash2 className="w-3 h-3" />
-                                    </Button>
+                        {/* Variation Column */}
+                        <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-top">
+                            <div className="flex flex-col gap-2 pt-1 uppercase">
+                                <Select 
+                                    value={variation.stage || ''} 
+                                    onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'stage', v === '_CLEAR_' ? '' : v)}
+                                    disabled={readOnly}
+                                >
+                                    <SelectTrigger className="h-7 text-[10px] font-black tracking-widest border-slate-100 dark:border-slate-800 bg-slate-100/50 dark:bg-zinc-950">
+                                        <SelectValue placeholder="ETAPA" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="_CLEAR_">SIN ETAPA</SelectItem>
+                                        <SelectItem value="T1">T1</SelectItem>
+                                        <SelectItem value="T2">T2</SelectItem>
+                                        <SelectItem value="T3">T3</SelectItem>
+                                        <SelectItem value="T4">T4</SelectItem>
+                                        <SelectItem value="T5">T5</SelectItem>
+                                        <SelectItem value="Montaje">Montaje</SelectItem>
+                                        <SelectItem value="Ajuste">Ajuste</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {!readOnly && (
+                                    <div className="flex gap-1 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => onAddVariation(item.machineId, dIndex)} className="p-1 text-slate-300 hover:text-primary transition-colors">
+                                            <Plus size={12} />
+                                        </button>
+                                        {detail.variations.length > 1 && (
+                                            <button onClick={() => onRemoveVariation(item.machineId, dIndex, vIndex)} className="p-1 text-slate-300 hover:text-destructive transition-colors">
+                                                <XCircle size={12} />
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </td>
-                        <td className="p-2 border align-top">
-                            <Select 
-                                value={variation.causeId} 
-                                onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'causeId', v)}
-                                disabled={readOnly}
-                            >
-                                <SelectTrigger className="w-[140px] h-8">
-                                    <SelectValue placeholder="Cause" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {causes.map((c: any) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </td>
-                        <td className="p-2 border align-top">
-                            <Textarea 
-                                value={variation.analysis} 
-                                onChange={(e) => onVariationChange(item.machineId, dIndex, vIndex, 'analysis', e.target.value)}
-                                placeholder="Analysis..."
-                                className="min-h-[80px] min-w-[200px] resize-y"
-                                disabled={readOnly}
-                            />
+
+                        {/* Analysis & Cause Section */}
+                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-top">
+                            <div className="flex flex-col gap-3">
+                                <Textarea 
+                                    value={variation.analysis} 
+                                    onChange={(e) => onVariationChange(item.machineId, dIndex, vIndex, 'analysis', e.target.value)}
+                                    placeholder="Escribir análisis técnico detallado..."
+                                    className="min-h-[80px] bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-xs italic shadow-none focus:border-primary/30 transition-all resize-none font-medium text-slate-500"
+                                    disabled={readOnly}
+                                />
+                                <div className="flex items-center gap-2 group/cause">
+                                    <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 tracking-widest uppercase">Causa:</span>
+                                    <Select 
+                                        value={variation.causeId} 
+                                        onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'causeId', v)}
+                                        disabled={readOnly}
+                                    >
+                                        <SelectTrigger className="h-6 gap-2 border-none bg-transparent hover:bg-slate-50 dark:hover:bg-zinc-800 p-0 shadow-none text-[10px] font-bold text-primary">
+                                            <SelectValue placeholder="Click para seleccionar causa..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {causes.map((c: any) => (
+                                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 ));
             })}
-        </>
+        </React.Fragment>
     );
-}
+});

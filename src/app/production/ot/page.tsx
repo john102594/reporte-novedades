@@ -38,7 +38,7 @@ export default function OTSearchPage() {
                 </Button>
             </Link>
             <div>
-                <h1 className="text-4xl font-black text-white bg-gradient-to-r from-white to-white/60 bg-clip-text">
+                <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
                     Buscador de OT
                 </h1>
                 <p className="text-muted-foreground font-medium">
@@ -48,7 +48,7 @@ export default function OTSearchPage() {
         </div>
       </div>
 
-      <div className="bg-card/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-2xl">
+      <div className="bg-card/30 backdrop-blur-md border border-border rounded-2xl p-6 shadow-2xl">
         <form onSubmit={handleSearch} className="flex gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -56,7 +56,7 @@ export default function OTSearchPage() {
               value={otNumber}
               onChange={(e) => setOtNumber(e.target.value)}
               placeholder="Ingrese el número de OT..."
-              className="pl-11 h-12 bg-white/5 border-white/20 text-lg font-bold placeholder:font-normal focus-visible:ring-primary"
+              className="pl-11 h-12 bg-accent/20 border-accent text-lg font-bold placeholder:font-normal focus-visible:ring-primary"
             />
           </div>
           <Button 
@@ -77,7 +77,7 @@ export default function OTSearchPage() {
       {results !== null && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white/90">
+            <h2 className="text-xl font-bold text-foreground">
               {results.length > 0 
                 ? `${results.length} reporte(s) encontrado(s)` 
                 : 'Sin resultados'}

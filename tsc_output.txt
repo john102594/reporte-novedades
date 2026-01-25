@@ -1,0 +1,6 @@
+src/components/action-plans/plans-view.tsx(238,5): error TS2657: JSX expressions must have one parent element.
+src/components/action-plans/plans-view.tsx(283,19): error TS17002: Expected corresponding JSX closing tag for 'DialogContent'.
+src/components/action-plans/plans-view.tsx(284,15): error TS17002: Expected corresponding JSX closing tag for 'Dialog'.
+src/components/action-plans/plans-view.tsx(285,11): error TS17002: Expected corresponding JSX closing tag for 'div'.
+src/components/action-plans/plans-view.tsx(658,5): error TS1005: ')' expected.
+src/components/action-plans/plans-view.tsx(659,3): error TS1109: Expression expected.
