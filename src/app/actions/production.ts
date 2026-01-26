@@ -9,10 +9,11 @@ export interface ProductionContext {
   machines: { id: string; name: string; operators: { id: string; name: string | null }[] }[];
   causes: { id: string; name: string }[];
   operators: { id: string; name: string | null }[];
+  variationTypes: { id: string; name: string; code: string }[];
 }
 
 export async function getProductionContext(areaId: string): Promise<ProductionContext> {
-  const [machines, causes, operators] = await Promise.all([
+  const [machines, causes, operators, variationTypes] = await Promise.all([
     prisma.machine.findMany({
       where: { areaId },
       select: { 
@@ -36,6 +37,15 @@ export async function getProductionContext(areaId: string): Promise<ProductionCo
       },
       select: { id: true, name: true },
       orderBy: { name: 'asc' }
+    }),
+    prisma.variationType.findMany({
+      where: { 
+        category: 'OPERATIVA',
+        isActive: true,
+        visibleToGestor: true
+      },
+      select: { id: true, name: true, code: true },
+      orderBy: { sortOrder: 'asc' }
     })
   ]);
   
@@ -63,6 +73,11 @@ export async function getProductionContext(areaId: string): Promise<ProductionCo
     operators: operators.map(op => ({
       id: op.id,
       name: op.name
+    })),
+    variationTypes: variationTypes.map(vt => ({
+      id: vt.id,
+      name: vt.name,
+      code: vt.code
     }))
   };
 }
@@ -90,7 +105,11 @@ export async function getShiftReport(areaId: string, date: string, shift: string
         include: {
           details: {
             include: {
-              variations: true
+              variations: {
+                include: {
+                  variationType: true
+                }
+              }
             }
           }
         }
@@ -127,7 +146,8 @@ export async function getShiftReport(areaId: string, date: string, shift: string
         kgDesp: detail.kgDesp,
         variations: detail.variations.map((v: any) => ({
           id: v.id,
-          stage: v.stage,
+          stage: v.variationType?.name || v.stage,
+          variationTypeId: v.variationTypeId,
           programId: v.programId,
           analysis: v.analysis
         }))
@@ -255,7 +275,7 @@ export async function saveShiftReport(data: any) {
           // Handle Variations
           if (detail.variations && detail.variations.length > 0) {
             // Filter out completely empty variations
-            const validVariations = detail.variations.filter((v: any) => v.causeId || v.analysis || v.stage);
+            const validVariations = detail.variations.filter((v: any) => v.causeId || v.analysis || v.variationTypeId);
             
             if (validVariations.length > 0) {
               for (const v of validVariations) {
@@ -263,20 +283,28 @@ export async function saveShiftReport(data: any) {
                   data: {
                     detailId: createdDetail.id,
                     programId: v.causeId || null,
-                    stage: v.stage || null,
+                    variationTypeId: v.variationTypeId || null,
+                    stage: v.stage || null, // Keep for legacy
                     analysis: v.analysis || null
                   },
                   include: {
-                    program: true
+                    program: true,
+                    variationType: true
                   }
                 });
+                
+                // Use the variationType name if available for the action task cause
+                const taskCause = createdVariation.program?.name || 
+                                 createdVariation.variationType?.name || 
+                                 "No especificada";
 
                 // AUTO-CREATE ActionTask
                 await tx.actionTask.create({
                   data: {
                     variationId: createdVariation.id,
+                    variationTypeId: createdVariation.variationTypeId,
                     ot: detail.ot || "N/A",
-                    cause: createdVariation.program?.name || "No especificada",
+                    cause: taskCause,
                     details: createdVariation.analysis || "Sin análisis previo",
                     status: "POR_REVISAR"
                   }

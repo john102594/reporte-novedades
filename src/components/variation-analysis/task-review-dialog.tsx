@@ -54,6 +54,7 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
     responsibleId: string | null;
     createdAt: string | Date;
     actionPlanId: string | null;
+    variationType?: { id: string; name: string } | null;
     actionPlan?: { 
         id: string; 
         name: string; 
@@ -86,7 +87,11 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
   const [activeTab, setActiveTab] = useState<'existing' | 'new'>('existing');
   
   // Cause Edit State
-  const [selectedCause, setSelectedCause] = useState(task.cause);
+  // If the initial cause is actually a variation type name, it might not be in the causes list.
+  // We check if it exists in the list to avoid displaying a name that doesn't belong to a FailureProgram.
+  const initialCause = causes.some(c => c.name === task.cause) ? task.cause : 
+                      (causes.length > 0 ? causes[0].name : '');
+  const [selectedCause, setSelectedCause] = useState(initialCause);
 
   // Assignment State
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -276,6 +281,11 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
                   'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800'}`}>
                 <CheckCircle2 size={12} /> {task.status.replace(/_/g, ' ')}
               </span>
+              {task.variationType && (
+                <Badge variant="outline" className="bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold px-3 py-1">
+                  TIPO: {task.variationType.name}
+                </Badge>
+              )}
             </div>
           </div>
           
@@ -310,11 +320,21 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
                     "{task.details}"
                   </p>
                 </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-50 dark:border-slate-800">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Causa Reportada:</span>
-                  <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700">
-                    {task.cause}
-                  </span>
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Causa Reportada:</span>
+                    <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700">
+                      {task.cause}
+                    </span>
+                  </div>
+                  {task.variationType && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Tipo:</span>
+                      <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-lg border border-purple-100 dark:border-purple-800">
+                        {task.variationType.name}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>

@@ -30,7 +30,7 @@ export default async function ProductionPage() {
   }
 
   // Sanitize data for Client Component with explicit mapping
-  const serializedAreas = areas.map(area => ({
+  const serializedAreas = (areas || []).map(area => ({
     id: area.id,
     name: area.name
   }));

@@ -10,6 +10,7 @@ export async function getActionTasks() {
 
   const tasks = await prisma.actionTask.findMany({
     include: {
+      variationType: true,
       variation: {
         include: {
           detail: {

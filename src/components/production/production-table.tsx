@@ -28,6 +28,7 @@ interface Cause {
 
 interface Variation {
   id?: string; // local or db id
+  variationTypeId?: string;
   stage: string;
   causeId: string;
   analysis: string;
@@ -57,6 +58,7 @@ interface ProductionTableProps {
   machines: Machine[];
   operators: Operator[];
   causes: Cause[];
+  variationTypes: { id: string; name: string; code: string }[];
   initialReport?: any; // The DB report object
   readOnly?: boolean;
   ownerName?: string;
@@ -69,6 +71,7 @@ export function ProductionTable({
   machines, 
   operators, 
   causes,
+  variationTypes,
   initialReport,
   readOnly,
   ownerName
@@ -98,6 +101,7 @@ export function ProductionTable({
                         kgDesp: d.kgDesp || '',
                         variations: d.variations.map((v: any) => ({
                             id: v.id,
+                            variationTypeId: v.variationTypeId,
                             stage: v.stage,
                             causeId: v.programId || v.causeId,
                             analysis: v.analysis
@@ -145,6 +149,7 @@ export function ProductionTable({
   });
 
   const createEmptyVariation = (): Variation => ({
+    variationTypeId: '',
     stage: '',
     causeId: '',
     analysis: ''
@@ -356,7 +361,7 @@ export function ProductionTable({
                             item={item} 
                             machineName={machine?.name || 'Unknown'} 
                             operators={machineOperators}
-                            causes={causes}
+                            variationTypes={variationTypes}
                             onOperatorChange={handleOperatorChange}
                             onDetailChange={handleDetailChange}
                             onVariationChange={handleVariationChange}
@@ -462,6 +467,7 @@ const MachineRow = React.memo(function MachineRow({
     machineName, 
     operators, 
     causes,
+    variationTypes,
     onOperatorChange,
     onDetailChange,
     onVariationChange,
@@ -544,40 +550,42 @@ const MachineRow = React.memo(function MachineRow({
                                 </td>
                                 
                                 <td rowSpan={variationRows} className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-middle text-center">
-                                    <div className="inline-flex flex-col items-center">
-                                        <DebouncedInput 
-                                            value={detail.efficiency} 
-                                            onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'efficiency', val)}
-                                            className={`h-8 w-16 text-center font-black border-none bg-transparent shadow-none focus-visible:ring-0 ${
-                                                parseFloat(detail.efficiency) > 92 
-                                                    ? 'text-emerald-500' 
-                                                    : parseFloat(detail.efficiency) >= 80 
-                                                        ? 'text-amber-500' 
-                                                        : 'text-rose-500'
-                                            }`}
-                                            disabled={readOnly}
-                                        />
-                                        <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-[-4px] block">%</span>
+                                    <div className="flex flex-col items-center gap-1 w-full max-w-[80px] mx-auto">
+                                        <div className="relative w-full">
+                                            <DebouncedInput 
+                                                value={detail.efficiency} 
+                                                onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'efficiency', val)}
+                                                className={`h-8 w-full text-center font-black bg-white dark:bg-zinc-950 pr-6 ${
+                                                    parseFloat(detail.efficiency) > 92 
+                                                        ? 'text-emerald-500 border-emerald-200' 
+                                                        : parseFloat(detail.efficiency) >= 80 
+                                                            ? 'text-amber-500 border-amber-200' 
+                                                            : 'text-rose-500 border-rose-200'
+                                                }`}
+                                                disabled={readOnly}
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 select-none">%</span>
+                                        </div>
                                     </div>
                                 </td>
 
                                 <td rowSpan={variationRows} className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-middle">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
+                                    <div className="flex flex-col gap-2 w-full">
+                                        <div className="space-y-1 w-full">
                                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Programado</span>
                                             <DebouncedInput 
                                                 value={detail.mtProg} 
                                                 onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'mtProg', val)}
-                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center"
+                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center w-full"
                                                 disabled={readOnly}
                                             />
                                         </div>
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 w-full">
                                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Producido</span>
                                             <DebouncedInput 
                                                 value={detail.mtProd} 
                                                 onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'mtProd', val)}
-                                                className="h-8 text-xs font-black bg-purple-50/30 dark:bg-purple-900/5 text-center border-primary/20"
+                                                className="h-8 text-xs font-black bg-purple-50/30 dark:bg-purple-900/5 text-center border-primary/20 w-full"
                                                 disabled={readOnly}
                                             />
                                         </div>
@@ -585,22 +593,22 @@ const MachineRow = React.memo(function MachineRow({
                                 </td>
 
                                 <td rowSpan={variationRows} className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-middle">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
+                                    <div className="flex flex-col gap-2 w-full">
+                                        <div className="space-y-1 w-full">
                                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em] block">Producido</span>
                                             <DebouncedInput 
                                                 value={detail.kgProd} 
                                                 onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'kgProd', val)}
-                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center"
+                                                className="h-8 text-xs font-bold bg-white dark:bg-zinc-950 text-center w-full"
                                                 disabled={readOnly}
                                             />
                                         </div>
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 w-full">
                                             <span className="text-[8px] font-bold text-rose-400 uppercase tracking-[0.1em] block">Desperdicio</span>
                                             <DebouncedInput 
                                                 value={detail.kgDesp} 
                                                 onChange={(val: any) => onDetailChange(item.machineId, dIndex, 'kgDesp', val)}
-                                                className="h-8 text-xs font-bold bg-rose-50/30 dark:bg-rose-900/5 text-center border-rose-100 dark:border-rose-900/50 text-rose-600"
+                                                className="h-8 text-xs font-bold bg-rose-50/30 dark:bg-rose-900/5 text-center border-rose-100 dark:border-rose-900/50 text-rose-600 w-full"
                                                 disabled={readOnly}
                                             />
                                         </div>
@@ -621,22 +629,23 @@ const MachineRow = React.memo(function MachineRow({
                         <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 align-top">
                             <div className="flex flex-col gap-2 pt-1 uppercase">
                                 <Select 
-                                    value={variation.stage || ''} 
-                                    onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'stage', v === '_CLEAR_' ? '' : v)}
+                                    value={variation.variationTypeId || ''} 
+                                    onValueChange={(v) => {
+                                        const selectedType = variationTypes.find(t => t.id === v);
+                                        onVariationChange(item.machineId, dIndex, vIndex, 'variationTypeId', v === '_CLEAR_' ? '' : v);
+                                        // Also update stage for legacy consistency if needed
+                                        onVariationChange(item.machineId, dIndex, vIndex, 'stage', selectedType?.name || '');
+                                    }}
                                     disabled={readOnly}
                                 >
                                     <SelectTrigger className="h-7 text-[10px] font-black tracking-widest border-slate-100 dark:border-slate-800 bg-slate-100/50 dark:bg-zinc-950">
                                         <SelectValue placeholder="ETAPA" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="_CLEAR_">SIN ETAPA</SelectItem>
-                                        <SelectItem value="T1">T1</SelectItem>
-                                        <SelectItem value="T2">T2</SelectItem>
-                                        <SelectItem value="T3">T3</SelectItem>
-                                        <SelectItem value="T4">T4</SelectItem>
-                                        <SelectItem value="T5">T5</SelectItem>
-                                        <SelectItem value="Montaje">Montaje</SelectItem>
-                                        <SelectItem value="Ajuste">Ajuste</SelectItem>
+                                        <SelectItem value="_CLEAR_">SIN VARIACION</SelectItem>
+                                        {(variationTypes || []).map((vt: any) => (
+                                            <SelectItem key={vt.id} value={vt.id}>{vt.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 {!readOnly && (
@@ -665,7 +674,7 @@ const MachineRow = React.memo(function MachineRow({
                                     disabled={readOnly}
                                 />
                                 <div className="flex items-center gap-2 group/cause">
-                                    <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 tracking-widest uppercase">Causa:</span>
+                                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">Causa:</span>
                                     <Select 
                                         value={variation.causeId} 
                                         onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'causeId', v)}
@@ -675,7 +684,7 @@ const MachineRow = React.memo(function MachineRow({
                                             <SelectValue placeholder="Click para seleccionar causa..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {causes.map((c: any) => (
+                                            {(causes || []).map((c: any) => (
                                                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                             ))}
                                         </SelectContent>

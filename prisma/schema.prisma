@@ -36,6 +36,10 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   shiftReports ShiftReport[]
+
+  // Additional Variations relations
+  createdVariations            AdditionalVariation[]         @relation("VariationCreator")
+  assignedAdditionalVariations AdditionalVariationOperator[] @relation("AdditionalVariationOperators")
 }
 
 model Area {
@@ -202,7 +206,10 @@ model ShiftReportVariation {
   detailId String
   detail   ShiftReportDetail @relation(fields: [detailId], references: [id], onDelete: Cascade)
 
-  stage     String? // "T1", "T5" etc
+  variationTypeId String?
+  variationType   VariationType? @relation(fields: [variationTypeId], references: [id])
+
+  stage     String? // keep for compatibility
   programId String?
   program   FailureProgram? @relation(fields: [programId], references: [id])
   analysis  String? // Manual text
@@ -211,9 +218,15 @@ model ShiftReportVariation {
 }
 
 model ActionTask {
-  id          String               @id @default(uuid())
-  variationId String               @unique
-  variation   ShiftReportVariation @relation(fields: [variationId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  // Can be linked to ShiftReportVariation OR AdditionalVariation (one or the other)
+  variationId String?               @unique
+  variation   ShiftReportVariation? @relation(fields: [variationId], references: [id], onDelete: Cascade)
+
+  // Dynamic link to the variation type (T1, T2, Desperdicio Adicional, etc)
+  variationTypeId String?
+  variationType   VariationType? @relation("VariationTypeTasks", fields: [variationTypeId], references: [id])
 
   // Information from variation
   ot      String
@@ -233,6 +246,9 @@ model ActionTask {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Link from AdditionalVariation
+  additionalVariation AdditionalVariation? @relation("AdditionalVariationTask")
 }
 
 model ActionPlan {
@@ -269,4 +285,62 @@ model PlanActivity {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// -- POST-REPORT VARIATIONS --
+
+// Master table for variation types
+model VariationType {
+  id              String  @id @default(uuid())
+  name            String  @unique // e.g., "T1", "T2", "Desperdicio Adicional", "Rechazo"
+  code            String  @unique // e.g., "T1", "T2", "DESPERDICIO_ADICIONAL", "RECHAZO"
+  description     String?
+  category        String // OPERATIVA (for T1-T5, Montaje, Ajuste), ADICIONAL (for post-report variations)
+  visibleToGestor Boolean @default(true) // If false, only visible to COORDINATOR/MANAGER
+  isActive        Boolean @default(true)
+  sortOrder       Int     @default(0)
+
+  additionalVariations  AdditionalVariation[]
+  shiftReportVariations ShiftReportVariation[]
+  actionTasks           ActionTask[]           @relation("VariationTypeTasks")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdditionalVariation {
+  id String @id @default(uuid())
+  ot String // Número de OT (referencia externa)
+
+  // Reference to VariationType master
+  typeId String
+  type   VariationType @relation(fields: [typeId], references: [id])
+
+  quantity    Float // Cantidad en Kg
+  description String? // Descripción/Justificación
+  status      String  @default("PENDIENTE") // PENDIENTE, EN_ANALISIS, RESUELTO
+
+  // Trazabilidad
+  createdById String
+  createdBy   User   @relation("VariationCreator", fields: [createdById], references: [id])
+
+  // Operadores responsables (muchos a muchos)
+  responsibleOperators AdditionalVariationOperator[]
+
+  // Link to action workflow (auto-created)
+  actionTaskId String?     @unique
+  actionTask   ActionTask? @relation("AdditionalVariationTask", fields: [actionTaskId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdditionalVariationOperator {
+  id          String              @id @default(uuid())
+  variationId String
+  variation   AdditionalVariation @relation(fields: [variationId], references: [id], onDelete: Cascade)
+  operatorId  String
+  operator    User                @relation("AdditionalVariationOperators", fields: [operatorId], references: [id])
+
+  @@unique([variationId, operatorId])
 }

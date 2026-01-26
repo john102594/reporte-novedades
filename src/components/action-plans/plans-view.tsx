@@ -54,11 +54,16 @@ import {
   Loader2,
   ChevronDown,
   Check,
-  X
+  X,
+  Target,
+  LayoutDashboard,
+  CircleDot
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 interface PlansViewProps {
   currentUser: { id: string; role: string } | null;
@@ -88,6 +93,7 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
   const [warningDesc, setWarningDesc] = useState('');
 
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
 
   // Buffered modifications for existing activities
   const [bufferedEdits, setBufferedEdits] = useState<Record<string, {
@@ -99,13 +105,21 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
   const toggleStatus = (status: string) => {
     if (status === 'ALL') {
       setSelectedStatuses([]);
-      return;
+    } else {
+      setSelectedStatuses(prev => 
+        prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+      );
     }
-    setSelectedStatuses(prev => 
-      prev.includes(status) 
-        ? prev.filter(s => s !== status) 
-        : [...prev, status]
-    );
+  };
+
+  const togglePriority = (priority: string) => {
+    if (priority === 'ALL') {
+      setSelectedPriorities([]);
+    } else {
+      setSelectedPriorities(prev => 
+        prev.includes(priority) ? prev.filter(p => p !== priority) : [...prev, priority]
+      );
+    }
   };
 
   const fetchPlans = async () => {
@@ -235,406 +249,466 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
   const assignableUsers = users.filter(u => ['MANAGER', 'COORDINATOR'].includes(u.role?.toUpperCase() || ''));
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-           <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-primary to-purple-600 dark:to-purple-400 bg-clip-text text-transparent tracking-tight">
              Planes de Acción
            </h1>
-           <p className="text-muted-foreground">Gestión y seguimiento de planes de mejora</p>
+           <p className="text-muted-foreground text-sm font-medium">Gestión operativa y mejora continua</p>
         </div>
         
         <Dialog>
             <DialogTrigger asChild>
-                <Button className="gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Plan
+                <Button className="h-11 px-6 rounded-xl bg-[#5C5DE5] hover:bg-[#4E4FD3] text-white shadow-lg shadow-[#5C5DE5]/20 gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                    <Plus className="w-5 h-5" />
+                    <span className="font-semibold">Crear Plan</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] !bg-white dark:!bg-zinc-950 !opacity-100 border-border shadow-xl">
+            <DialogContent className="sm:max-w-[500px] !bg-white dark:!bg-zinc-950 !opacity-100 border-border shadow-2xl rounded-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-foreground">Crear Nuevo Plan de Acción</DialogTitle>
+                    <DialogTitle className="text-xl font-bold text-foreground">Crear Nuevo Plan de Acción</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-6 py-6">
                     <div className="space-y-2">
-                        <Label className="text-foreground">Nombre del Plan</Label>
-                        <Input className="bg-background border-input text-foreground" placeholder="Ej. Plan de mejora Piel de Naranja" value={newPlanName} onChange={e => setNewPlanName(e.target.value)} />
+                        <Label className="text-sm font-semibold text-foreground/80">Nombre del Plan</Label>
+                        <Input 
+                          className="h-11 px-4 rounded-xl bg-slate-50 border-slate-200 focus:ring-[#5C5DE5] focus:border-[#5C5DE5] text-foreground transition-all" 
+                          placeholder="Ej. Plan de mejora Piel de Naranja" 
+                          value={newPlanName} 
+                          onChange={e => setNewPlanName(e.target.value)} 
+                        />
                     </div>
                     <div className="space-y-2">
-                            <Label className="text-foreground">Prioridad</Label>
-                            <Select value={newPlanPriority} onValueChange={setNewPlanPriority}>
-                                <SelectTrigger className="bg-background border-input text-foreground">
-                                    <SelectValue placeholder="Seleccionar prioridad" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-zinc-950 border-input text-foreground">
-                                    <SelectItem value="ALTA">Alta</SelectItem>
-                                    <SelectItem value="MEDIA">Media</SelectItem>
-                                    <SelectItem value="BAJA">Baja</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Label className="text-sm font-semibold text-foreground/80">Prioridad</Label>
+                        <Select value={newPlanPriority} onValueChange={setNewPlanPriority}>
+                            <SelectTrigger className="h-11 px-4 rounded-xl bg-slate-50 border-slate-200 focus:ring-[#5C5DE5] focus:border-[#5C5DE5] text-foreground">
+                                <SelectValue placeholder="Seleccionar prioridad" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-zinc-950 border-slate-200 text-foreground rounded-xl">
+                                <SelectItem value="ALTA" className="py-2 hover:bg-red-50 focus:bg-red-50">Alta</SelectItem>
+                                <SelectItem value="MEDIA" className="py-2 hover:bg-amber-50 focus:bg-amber-50">Media</SelectItem>
+                                <SelectItem value="BAJA" className="py-2 hover:bg-blue-50 focus:bg-blue-50">Baja</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Button 
                         onClick={handleCreatePlan} 
                         disabled={isCreatingPlan || !newPlanName} 
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all font-bold py-2"
+                        className="w-full h-12 bg-[#5C5DE5] hover:bg-[#4E4FD3] text-white rounded-xl shadow-lg shadow-[#5C5DE5]/10 transition-all font-bold text-base mt-2"
                     >
-                        {isCreatingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Crear Plan'}
+                        {isCreatingPlan ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Creación'}
                     </Button>
                 </div>
             </DialogContent>
         </Dialog>
       </div>
 
-      <div className="flex justify-end items-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filtrar:</span>
-        <div className="flex gap-2 p-1 bg-muted/30 rounded-full border border-border/50">
-            <Badge 
-                variant={selectedStatuses.length === 0 ? 'default' : 'outline'}
-                className="cursor-pointer transition-all hover:scale-105 active:scale-95 px-3"
-                onClick={() => toggleStatus('ALL')}
-            >
-                Todos
-            </Badge>
-            <Badge 
-                variant={selectedStatuses.includes('REVISION') ? 'secondary' : 'outline'}
-                className={`cursor-pointer transition-all hover:scale-105 active:scale-95 px-3 ${
-                    selectedStatuses.includes('REVISION') ? 'bg-yellow-100 text-red-700 border-yellow-300' : ''
-                }`}
-                onClick={() => toggleStatus('REVISION')}
-            >
-                En Revisión
-            </Badge>
-            <Badge 
-                variant={selectedStatuses.includes('ABIERTO') ? 'default' : 'outline'}
-                className={`cursor-pointer transition-all hover:scale-105 active:scale-95 px-3 ${
-                    selectedStatuses.includes('ABIERTO') ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700' : ''
-                }`}
-                onClick={() => toggleStatus('ABIERTO')}
-            >
-                En Curso
-            </Badge>
-            <Badge 
-                variant={selectedStatuses.includes('CERRADO') ? 'secondary' : 'outline'}
-                className={`cursor-pointer transition-all hover:scale-105 active:scale-95 px-3 ${
-                    selectedStatuses.includes('CERRADO') ? 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200' : ''
-                }`}
-                onClick={() => toggleStatus('CERRADO')}
-            >
-                Cerrados
-            </Badge>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 w-fit rounded-xl border border-slate-200/50">
+          {[
+            { id: 'ALL', label: 'Todos' },
+            { id: 'REVISION', label: 'En Revisión' },
+            { id: 'ABIERTO', label: 'En Curso' },
+            { id: 'CERRADO', label: 'Cerrados' }
+          ].map((tab) => {
+            const isActive = tab.id === 'ALL' ? selectedStatuses.length === 0 : selectedStatuses.includes(tab.id);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => toggleStatus(tab.id)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+                  isActive 
+                    ? "bg-white dark:bg-zinc-900 text-[#5C5DE5] shadow-sm ring-1 ring-slate-200/50" 
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/50 dark:hover:bg-zinc-900/50"
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 w-fit rounded-xl border border-slate-200/50">
+          {[
+            { id: 'ALL', label: 'Todas', color: '' },
+            { id: 'ALTA', label: 'Alta', color: 'text-red-600' },
+            { id: 'MEDIA', label: 'Media', color: 'text-amber-600' },
+            { id: 'BAJA', label: 'Baja', color: 'text-blue-600' }
+          ].map((tab) => {
+            const isActive = tab.id === 'ALL' ? selectedPriorities.length === 0 : selectedPriorities.includes(tab.id);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => togglePriority(tab.id)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+                  isActive 
+                    ? `bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-slate-200/50 ${tab.color || 'text-[#5C5DE5]'}` 
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/50 dark:hover:bg-zinc-900/50"
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border shadow-sm p-1">
-        <Accordion type="multiple" className="w-full space-y-2">
-            {plans
-              .filter(p => selectedStatuses.length === 0 || selectedStatuses.includes(p.status))
-              .map((plan) => {
-                // Calculate max deadline from activities
-                const activityDeadlines = plan.activities?.map((a: any) => new Date(a.deadline).getTime()) || [];
-                const maxDeadline = activityDeadlines.length > 0 ? new Date(Math.max(...activityDeadlines)) : null;
-                const displayEnd = plan.endDate ? new Date(plan.endDate) : maxDeadline;
+      <div className="space-y-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400">
+            <Loader2 className="w-10 h-10 animate-spin text-[#5C5DE5]" />
+            <p className="font-medium animate-pulse">Cargando planes operativos...</p>
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-400 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+            <LayoutDashboard className="w-12 h-12 opacity-20" />
+            <p className="font-medium">No se encontraron planes para mostrar.</p>
+          </div>
+        ) : (
+          <Accordion type="multiple" className="w-full space-y-4">
+              {plans
+                .filter(p => selectedStatuses.length === 0 || selectedStatuses.includes(p.status))
+                .filter(p => selectedPriorities.length === 0 || selectedPriorities.includes(p.priority || 'MEDIA'))
+                .map((plan) => {
+                  const total = plan.activities?.length || 0;
+                  const finished = plan.activities?.filter((a: any) => a.status === 'FINALIZADA').length || 0;
+                  
+                  // Weighted progress calculation
+                  let progress = 0;
+                  if (plan.activities && plan.activities.length > 0) {
+                    let totalWeight = 0;
+                    let weightedSum = 0;
+                    
+                    for (const act of plan.activities) {
+                      const startDate = new Date(act.startDate || act.createdAt);
+                      const endDate = new Date(act.deadline);
+                      const duration = Math.max(1, (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)); // days, min 1
+                      
+                      let actProgress = 0;
+                      if (act.status === 'FINALIZADA') actProgress = 100;
+                      else if (act.status === 'EN_PROCESO') actProgress = 50;
+                      // PENDIENTE = 0
+                      
+                      weightedSum += actProgress * duration;
+                      totalWeight += duration;
+                    }
+                    
+                    progress = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+                  }
 
-                // Calculate activity counts
-                const total = plan.activities?.length || 0;
-                const finished = plan.activities?.filter((a: any) => a.status === 'FINALIZADA').length || 0;
-                const inProgress = plan.activities?.filter((a: any) => a.status === 'EN_PROCESO').length || 0;
-                const pending = plan.activities?.filter((a: any) => a.status === 'PENDIENTE').length || 0;
+                  const activityDeadlines = plan.activities?.map((a: any) => new Date(a.deadline).getTime()) || [];
+                  const maxDeadline = activityDeadlines.length > 0 ? new Date(Math.max(...activityDeadlines)) : null;
+                  const startDate = new Date(plan.startDate);
+                  const displayEnd = plan.endDate ? new Date(plan.endDate) : maxDeadline;
 
-                return (
-                <AccordionItem key={plan.id} value={plan.id} className="border rounded-lg bg-background px-4">
-                    <AccordionTrigger className="hover:no-underline py-4">
-                        <div className="flex items-center justify-between w-full pr-4">
-                            <div className="flex items-center gap-4">
-                                <span className="font-semibold text-lg">{plan.name}</span>
-                                <Badge 
-                                    variant="outline"
-                                    className={`
-                                        ${plan.status === 'REVISION' ? 'bg-yellow-50 text-red-600 border-yellow-200' : 
-                                          plan.status === 'ABIERTO' ? 'bg-blue-600 text-white border-blue-700 font-bold' : 
-                                          'bg-emerald-100 text-emerald-800 border-emerald-200'}
-                                    `}
-                                >
-                                    {plan.status === 'ABIERTO' ? 'EN CURSO' : plan.status === 'REVISION' ? 'EN REVISIÓN' : plan.status}
-                                </Badge>
+                  return (
+                  <AccordionItem key={plan.id} value={plan.id} className="group border rounded-2xl bg-white dark:bg-zinc-950 shadow-sm border-slate-200/60 overflow-hidden transition-all hover:border-slate-300">
+                      <AccordionTrigger className="hover:no-underline py-6 px-6">
+                          <div className="flex flex-wrap items-center justify-between w-full pr-4 text-left gap-4">
+                              <div className="flex items-center gap-6 min-w-0">
+                                  <div className="flex flex-col min-w-0">
+                                      <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100 truncate">{plan.name}</h3>
+                                      <div className="flex items-center gap-2 mt-1">
+                                          <Badge 
+                                              className={cn(
+                                                  "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md",
+                                                  plan.priority === 'ALTA' ? "bg-red-50 text-red-600 border-red-100" :
+                                                  plan.priority === 'MEDIA' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                                  "bg-blue-50 text-blue-600 border-blue-100"
+                                              )}
+                                              variant="outline"
+                                          >
+                                              {plan.priority || 'MEDIA'}
+                                          </Badge>
+                                          <Badge 
+                                              className={cn(
+                                                  "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md",
+                                                  plan.status === 'ABIERTO' ? "bg-[#5C5DE5]/10 text-[#5C5DE5] border-[#5C5DE5]/20" :
+                                                  plan.status === 'REVISION' ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                                  "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                              )}
+                                              variant="outline"
+                                          >
+                                              {plan.status === 'ABIERTO' ? 'EN CURSO' : plan.status === 'REVISION' ? 'EN REVISIÓN' : plan.status}
+                                          </Badge>
+                                      </div>
+                                  </div>
 
-                                <Badge 
-                                    variant="secondary"
-                                    className={`
-                                        ${plan.priority === 'ALTA' ? 'bg-red-100 text-red-700 border-red-200' : 
-                                          plan.priority === 'MEDIA' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
-                                          'bg-blue-100 text-blue-700 border-blue-200'}
-                                    `}
-                                >
-                                    {plan.priority || 'MEDIA'}
-                                </Badge>
-                                
-                                {currentUser?.role === 'MANAGER' && plan.status === 'REVISION' && (
-                                    <Button 
-                                        size="sm" 
-                                        variant="default"
-                                        className="h-7 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                                        onClick={async (e) => {
-                                            e.stopPropagation();
-                                            const res = await updateActionPlanStatus(plan.id, 'ABIERTO');
-                                            if (res.success) {
-                                                toast.success('Plan aprobado y puesto en marcha');
-                                                fetchPlans();
-                                            } else {
-                                                toast.error('Error al aprobar el plan');
-                                            }
-                                        }}
-                                    >
-                                        <CheckCircle2 className="w-3 h-3" /> Aprobar Plan
-                                    </Button>
-                                )}
+                                  <div className="hidden lg:flex flex-col gap-1 w-48">
+                                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                                          <span>{progress}%</span>
+                                          <span>{finished}/{total} tareas</span>
+                                      </div>
+                                      <Progress value={progress} className="h-1.5 bg-slate-200" indicatorClassName="bg-[#5C5DE5]" />
+                                  </div>
+                              </div>
 
-                                {currentUser?.role === 'MANAGER' && plan.status === 'ABIERTO' && (
-                                    <Button 
-                                        asChild
-                                        size="sm" 
-                                        variant="outline" 
-                                        className="h-6 text-xs gap-1 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 text-emerald-600 cursor-pointer"
-                                    >
-                                        <div
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                const unfinished = plan.activities?.some((a: any) => a.status !== 'FINALIZADA');
-                                                if (unfinished) {
-                                                    setWarningTitle('No se puede cerrar el plan');
-                                                    setWarningDesc('Existen actividades pendientes o en curso. Todas las actividades vinculadas al plan deben estar en estado FINALIZADA para poder proceder con el cierre.');
-                                                    setShowWarning(true);
-                                                    return;
-                                                }
-                                                const res = await updateActionPlanStatus(plan.id, 'CERRADO');
-                                                if (res.success) {
-                                                    toast.success('Plan cerrado exitosamente');
-                                                    fetchPlans();
-                                                } else {
-                                                    toast.error('Error al cerrar el plan');
-                                                }
-                                            }}
-                                        >
-                                            <CheckCircle2 className="w-3 h-3" /> Cerrar Plan
-                                        </div>
-                                    </Button>
-                                )}
+                              <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                                  <div className="flex items-center gap-2 text-slate-500 whitespace-nowrap">
+                                      <Calendar className="w-4 h-4 opacity-50" />
+                                      <span className="text-xs font-bold">
+                                          {format(startDate, 'dd/MM/yyyy')} — {displayEnd ? format(displayEnd, 'dd/MM/yyyy') : '...'}
+                                      </span>
+                                  </div>
 
-                                {total > 0 && (
-                                    <div className="flex items-center gap-3 text-[10px] font-bold ml-2 border-l pl-4 border-slate-200 dark:border-slate-800 hidden lg:flex">
-                                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            {finished}/{total} Finalizadas
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                            {inProgress}/{total} En Curso
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                            {pending}/{total} Pendientes
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-6 text-sm text-muted-foreground hidden md:flex">
-                                <div className="flex items-center gap-1">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>Inicio: {format(new Date(plan.startDate), 'dd/MM/yyyy')}</span>
-                                </div>
-                                {displayEnd && (
-                                    <div className="flex items-center gap-1">
-                                        <Calendar className="w-4 h-4" />
-                                        <span>Fin: {format(displayEnd, 'dd/MM/yyyy')}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-2 pb-6">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                    <TableHead className="w-[40%]">Actividad</TableHead>
-                                    <TableHead>Responsable</TableHead>
-                                    <TableHead>Inicio</TableHead>
-                                    <TableHead>Fin</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                    <TableHead className="w-[80px]">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {plan.activities.map((act: any) => {
-                                    const edits = bufferedEdits[act.id];
-                                    const isEditing = !!edits;
+                                  {currentUser?.role === 'MANAGER' && plan.status === 'REVISION' && (
+                                      <div 
+                                          role="button"
+                                          tabIndex={0}
+                                          className="inline-flex items-center h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] gap-2 shadow-sm cursor-pointer transition-colors"
+                                          onClick={async (e) => {
+                                              e.stopPropagation();
+                                              const res = await updateActionPlanStatus(plan.id, 'ABIERTO');
+                                              if (res.success) {
+                                                  toast.success('Plan aprobado y puesto en marcha');
+                                                  fetchPlans();
+                                              } else {
+                                                  toast.error('Error al aprobar el plan');
+                                              }
+                                          }}
+                                      >
+                                          <Check className="w-3 h-3" /> Aprobar Plan
+                                      </div>
+                                  )}
 
-                                    return (
-                                    <TableRow key={act.id}>
-                                        <TableCell className="font-medium">{act.description}</TableCell>
-                                        <TableCell>
-                                            {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
-                                                <Select
-                                                    value={edits?.responsibleId || act.responsibleId}
-                                                    onValueChange={(val) => handleUpdateResponsible(act.id, val)}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs bg-background border-input text-foreground">
-                                                        <SelectValue placeholder="Responsable" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="bg-white dark:bg-zinc-950 border-input text-foreground">
-                                                        {assignableUsers.map((user) => (
-                                                            <SelectItem key={user.id} value={user.id}>
-                                                                {user.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            ) : (
-                                                act.responsible?.name
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
-                                                <Input 
-                                                    type="date"
-                                                    className="h-8 text-xs w-32"
-                                                    value={edits?.startDate || format(new Date(act.startDate), 'yyyy-MM-dd')}
-                                                    onChange={(e) => handleUpdateDate(act.id, 'startDate', e.target.value)}
-                                                />
-                                            ) : (
-                                                format(new Date(act.startDate), 'dd/MM/yyyy')
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
-                                                <Input 
-                                                    type="date"
-                                                    className="h-8 text-xs w-32"
-                                                    value={edits?.deadline || format(new Date(act.deadline), 'yyyy-MM-dd')}
-                                                    onChange={(e) => handleUpdateDate(act.id, 'deadline', e.target.value)}
-                                                />
-                                            ) : (
-                                                format(new Date(act.deadline), 'dd/MM/yyyy')
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Select
-                                                defaultValue={act.status}
-                                                onValueChange={(val) => handleUpdateStatus(act.id, val)}
-                                            >
-                                                <SelectTrigger className={`h-8 w-[140px] border-none ${
-                                                    act.status === 'FINALIZADA' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 
-                                                    act.status === 'EN_PROCESO' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 
-                                                    'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="PENDIENTE">
-                                                        <span className="flex items-center gap-2">
-                                                            <Clock className="w-4 h-4 text-gray-400" /> Pendiente
-                                                        </span>
-                                                    </SelectItem>
-                                                    <SelectItem value="EN_PROCESO">
-                                                        <span className="flex items-center gap-2">
-                                                            <Loader2 className="w-4 h-4 text-blue-500 animate-spin-slow" /> En Proceso
-                                                        </span>
-                                                    </SelectItem>
-                                                    <SelectItem value="FINALIZADA">
-                                                        <span className="flex items-center gap-2">
-                                                            <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Finalizada
-                                                        </span>
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </TableCell>
-                                        <TableCell>
-                                            {isEditing && (
-                                                <div className="flex items-center gap-1">
-                                                    <Button 
-                                                        size="icon" 
-                                                        variant="ghost" 
-                                                        className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                                        onClick={() => saveBufferedEdits(act.id)}
-                                                    >
-                                                        <Check className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button 
-                                                        size="icon" 
-                                                        variant="ghost" 
-                                                        className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                        onClick={() => cancelBufferedEdits(act.id)}
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                    );
-                                })}
-                                
-                                {/* Add Activity Row */}
-                                {(plan.status === 'REVISION' || (currentUser?.role === 'MANAGER' && plan.status === 'ABIERTO')) && (
-                                    <TableRow className="bg-blue-50/30 dark:bg-blue-900/10">
-                                        <TableCell>
-                                            <Input 
-                                                className="h-8 text-xs" 
-                                                placeholder="Nueva actividad..." 
-                                                value={newActivityState[plan.id]?.desc || ''} 
-                                                onChange={e => updateActivityForm(plan.id, 'desc', e.target.value)} 
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Select 
-                                                value={newActivityState[plan.id]?.resp || ''} 
-                                                onValueChange={val => updateActivityForm(plan.id, 'resp', val)}
-                                            >
-                                                <SelectTrigger className="h-8 text-xs bg-background border-input text-foreground">
-                                                    <SelectValue placeholder="Resp." />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white dark:bg-zinc-950 border-input text-foreground">
-                                                    {assignableUsers.map(u => (
-                                                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="date" 
-                                                className="h-8 text-xs" 
-                                                value={newActivityState[plan.id]?.start || ''} 
-                                                onChange={e => updateActivityForm(plan.id, 'start', e.target.value)} 
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input 
-                                                type="date" 
-                                                className="h-8 text-xs" 
-                                                value={newActivityState[plan.id]?.end || ''} 
-                                                onChange={e => updateActivityForm(plan.id, 'end', e.target.value)} 
-                                            />
-                                        </TableCell>
-                                        <TableCell colSpan={2}>
-                                            <Button size="sm" className="h-8 w-full gap-2" onClick={() => handleAddActivity(plan.id)}>
-                                                <Plus className="w-3 h-3" /> Agregar
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {plan.status === 'ABIERTO' && currentUser?.role !== 'MANAGER' && (
-                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-xs text-muted-foreground italic py-2">
-                                            El plan está en curso. Solo los administradores pueden agregar nuevas actividades.
-                                        </TableCell>
-                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-        </Accordion>
+                                  {currentUser?.role === 'MANAGER' && plan.status === 'ABIERTO' && (
+                                      <div 
+                                          role="button"
+                                          tabIndex={0}
+                                          className="inline-flex items-center h-8 px-4 rounded-lg bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600/20 font-bold text-[11px] gap-2 border border-emerald-200 cursor-pointer transition-colors"
+                                          onClick={async (e) => {
+                                              e.stopPropagation();
+                                              const unfinished = plan.activities?.some((a: any) => a.status !== 'FINALIZADA');
+                                              if (unfinished) {
+                                                  setWarningTitle('No se puede cerrar el plan');
+                                                  setWarningDesc('Existen actividades pendientes o en curso. Todas las actividades vinculadas al plan deben estar en estado FINALIZADA para poder proceder con el cierre.');
+                                                  setShowWarning(true);
+                                                  return;
+                                              }
+                                              const res = await updateActionPlanStatus(plan.id, 'CERRADO');
+                                              if (res.success) {
+                                                  toast.success('Plan cerrado exitosamente');
+                                                  fetchPlans();
+                                              } else {
+                                                  toast.error('Error al cerrar el plan');
+                                              }
+                                          }}
+                                      >
+                                          <CheckCircle2 className="w-3 h-3" /> Cerrar Plan
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="border-t border-slate-100">
+                          <div className="p-0 overflow-x-auto">
+                              <Table>
+                                  <TableHeader>
+                                      <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                                          <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-wider pl-6">Actividad</TableHead>
+                                          <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-wider text-center">Responsable</TableHead>
+                                          <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-wider text-center">Periodo</TableHead>
+                                          <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-wider text-center">Estado</TableHead>
+                                          <TableHead className="text-[10px] font-black uppercase text-slate-500 tracking-wider text-right pr-6 w-[120px]">Acciones</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {plan.activities.map((act: any) => {
+                                          const edits = bufferedEdits[act.id];
+                                          const isEditing = !!edits;
+
+                                          return (
+                                          <TableRow key={act.id} className="group hover:bg-slate-50 transition-colors border-slate-100">
+                                              <TableCell className="font-bold text-slate-700 pl-6 text-sm">{act.description}</TableCell>
+                                              <TableCell className="text-center">
+                                                  {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
+                                                      <div className="flex items-center justify-center gap-2">
+                                                          <UserCircle className="w-4 h-4 text-slate-300" />
+                                                          <Select
+                                                              value={edits?.responsibleId || act.responsibleId}
+                                                              onValueChange={(val) => handleUpdateResponsible(act.id, val)}
+                                                          >
+                                                              <SelectTrigger className="h-8 text-xs bg-white border-slate-200 text-slate-600 focus:ring-[#5C5DE5] w-[140px]">
+                                                                  <SelectValue placeholder="Responsable" />
+                                                              </SelectTrigger>
+                                                              <SelectContent className="bg-white dark:bg-zinc-950 border-slate-200">
+                                                                  {assignableUsers.map((user) => (
+                                                                      <SelectItem key={user.id} value={user.id}>
+                                                                          {user.name}
+                                                                      </SelectItem>
+                                                                  ))}
+                                                              </SelectContent>
+                                                          </Select>
+                                                      </div>
+                                                  ) : (
+                                                      <div className="flex items-center justify-center gap-2 text-slate-600 font-medium text-xs">
+                                                          <UserCircle className="w-4 h-4 text-slate-300" />
+                                                          {act.responsible?.name}
+                                                      </div>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell className="text-center font-bold text-slate-500 text-xs whitespace-nowrap">
+                                                  {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
+                                                      <div className="flex items-center justify-center gap-2">
+                                                          <Input 
+                                                              type="date"
+                                                              className="h-8 text-[10px] w-28 bg-white"
+                                                              value={edits?.startDate || format(new Date(act.startDate), 'yyyy-MM-dd')}
+                                                              onChange={(e) => handleUpdateDate(act.id, 'startDate', e.target.value)}
+                                                          />
+                                                          <span className="opacity-30">/</span>
+                                                          <Input 
+                                                              type="date"
+                                                              className="h-8 text-[10px] w-28 bg-white"
+                                                              value={edits?.deadline || format(new Date(act.deadline), 'yyyy-MM-dd')}
+                                                              onChange={(e) => handleUpdateDate(act.id, 'deadline', e.target.value)}
+                                                          />
+                                                      </div>
+                                                  ) : (
+                                                      `${format(new Date(act.startDate), 'dd/MM/yyyy')} / ${format(new Date(act.deadline), 'dd/MM/yyyy')}`
+                                                  )}
+                                              </TableCell>
+                                              <TableCell>
+                                                  <div className="flex justify-center">
+                                                      <Select
+                                                          defaultValue={act.status}
+                                                          onValueChange={(val) => handleUpdateStatus(act.id, val)}
+                                                      >
+                                                          <SelectTrigger className={cn(
+                                                              "h-8 w-[140px] text-[10px] font-black uppercase tracking-wider rounded-lg border shadow-sm transition-all",
+                                                              act.status === 'FINALIZADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100' : 
+                                                              act.status === 'EN_PROCESO' ? 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100' : 
+                                                              'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                                                          )}>
+                                                              <SelectValue />
+                                                          </SelectTrigger>
+                                                          <SelectContent className="bg-white rounded-xl border-slate-200">
+                                                              <SelectItem value="PENDIENTE" className="text-[10px] font-bold py-2">
+                                                                  <span className="flex items-center gap-2 text-slate-500">
+                                                                      <Clock className="w-3.5 h-3.5" /> PENDIENTE
+                                                                  </span>
+                                                              </SelectItem>
+                                                              <SelectItem value="EN_PROCESO" className="text-[10px] font-bold py-2">
+                                                                  <span className="flex items-center gap-2 text-blue-600">
+                                                                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> EN PROCESO
+                                                                  </span>
+                                                              </SelectItem>
+                                                              <SelectItem value="FINALIZADA" className="text-[10px] font-bold py-2">
+                                                                  <span className="flex items-center gap-2 text-emerald-600">
+                                                                      <CheckCircle2 className="w-3.5 h-3.5" /> FINALIZADA
+                                                                  </span>
+                                                              </SelectItem>
+                                                          </SelectContent>
+                                                      </Select>
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell className="pr-6">
+                                                  <div className="flex items-center justify-end gap-1">
+                                                      {isEditing ? (
+                                                          <>
+                                                              <Button 
+                                                                  size="icon" 
+                                                                  variant="ghost" 
+                                                                  className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                                                                  onClick={() => saveBufferedEdits(act.id)}
+                                                              >
+                                                                  <Check className="w-4 h-4" />
+                                                              </Button>
+                                                              <Button 
+                                                                  size="icon" 
+                                                                  variant="ghost" 
+                                                                  className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-lg"
+                                                                  onClick={() => cancelBufferedEdits(act.id)}
+                                                              >
+                                                                  <X className="w-4 h-4" />
+                                                              </Button>
+                                                          </>
+                                                      ) : (
+                                                          <div className="w-8 h-8 opacity-0 pointer-events-none" />
+                                                      )}
+                                                  </div>
+                                              </TableCell>
+                                          </TableRow>
+                                          );
+                                      })}
+                                      
+                                      {/* Add Activity Row */}
+                                      {(plan.status === 'REVISION' || (currentUser?.role === 'MANAGER' && plan.status === 'ABIERTO')) && (
+                                          <TableRow className="bg-[#5C5DE5]/5 dark:bg-[#5C5DE5]/10 border-slate-100">
+                                              <TableCell className="pl-6">
+                                                  <Input 
+                                                      className="h-9 text-xs rounded-xl bg-white/80 border-slate-200 focus:ring-[#5C5DE5]" 
+                                                      placeholder="Nueva actividad..." 
+                                                      value={newActivityState[plan.id]?.desc || ''} 
+                                                      onChange={e => updateActivityForm(plan.id, 'desc', e.target.value)} 
+                                                  />
+                                              </TableCell>
+                                              <TableCell>
+                                                  <Select 
+                                                      value={newActivityState[plan.id]?.resp || ''} 
+                                                      onValueChange={val => updateActivityForm(plan.id, 'resp', val)}
+                                                  >
+                                                      <SelectTrigger className="h-9 text-xs bg-white/80 border-slate-200 rounded-xl">
+                                                          <SelectValue placeholder="Asignar..." />
+                                                      </SelectTrigger>
+                                                      <SelectContent className="bg-white rounded-xl">
+                                                          {assignableUsers.map(u => (
+                                                              <SelectItem key={u.id} value={u.id} className="text-xs">{u.name}</SelectItem>
+                                                          ))}
+                                                      </SelectContent>
+                                                  </Select>
+                                              </TableCell>
+                                              <TableCell>
+                                                  <div className="flex items-center justify-center gap-2">
+                                                      <Input 
+                                                          type="date" 
+                                                          className="h-9 text-[10px] w-28 bg-white/80 border-slate-200 rounded-xl" 
+                                                          value={newActivityState[plan.id]?.start || ''} 
+                                                          onChange={e => updateActivityForm(plan.id, 'start', e.target.value)} 
+                                                      />
+                                                      <span className="opacity-30">/</span>
+                                                      <Input 
+                                                          type="date" 
+                                                          className="h-9 text-[10px] w-28 bg-white/80 border-slate-200 rounded-xl" 
+                                                          value={newActivityState[plan.id]?.end || ''} 
+                                                          onChange={e => updateActivityForm(plan.id, 'end', e.target.value)} 
+                                                      />
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell></TableCell>
+                                              <TableCell className="pr-6 text-right">
+                                                  <Button 
+                                                      size="sm" 
+                                                      className="h-9 px-6 rounded-xl bg-[#5C5DE5] hover:bg-[#4E4FD3] text-white font-bold text-xs gap-2 shadow-sm shadow-[#5C5DE5]/10" 
+                                                      onClick={() => handleAddActivity(plan.id)}
+                                                  >
+                                                      <Plus className="w-4 h-4" /> Añadir
+                                                  </Button>
+                                              </TableCell>
+                                          </TableRow>
+                                      )}
+                                      {plan.status === 'ABIERTO' && currentUser?.role !== 'MANAGER' && (
+                                           <TableRow className="bg-slate-50/30">
+                                              <TableCell colSpan={5} className="text-center text-[11px] text-slate-400 italic py-4">
+                                                  <div className="flex items-center justify-center gap-2">
+                                                    <CircleDot className="w-3 h-3 opacity-30" />
+                                                    Plan en curso. Reservado para gerencia y coordinación.
+                                                  </div>
+                                              </TableCell>
+                                           </TableRow>
+                                      )}
+                                  </TableBody>
+                              </Table>
+                          </div>
+                      </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+          </Accordion>
+        )}
       </div>
 
       <AlertDialog open={showWarning} onOpenChange={setShowWarning}>

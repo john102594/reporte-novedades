@@ -51,9 +51,17 @@ export function ProductionManager({ areas, userId }: { areas: Area[], userId: st
       setContext(ctx);
       setReport(rep);
       
+      console.log('[ProductionManager] Context loaded:', {
+        areaId: targetArea,
+        causeCount: ctx.causes?.length,
+        machineCount: ctx.machines?.length,
+        opsCount: ctx.operators?.length,
+        firstCause: ctx.causes?.[0]
+      });
+
       setStep('table');
     } catch (error) {
-      console.error(error);
+      console.error('[ProductionManager] Error fetching data:', error);
       // Handle error (toast)
     } finally {
       setIsLoading(false);
@@ -145,6 +153,7 @@ export function ProductionManager({ areas, userId }: { areas: Area[], userId: st
             machines={context.machines}
             operators={context.operators}
             causes={context.causes}
+            variationTypes={context.variationTypes}
             initialReport={report}
             readOnly={isReadOnly}
             ownerName={isReadOnly ? ownerName : undefined}

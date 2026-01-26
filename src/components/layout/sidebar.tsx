@@ -15,7 +15,9 @@ import {
   Menu,
   FileText,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  ListTodo,
+  PackagePlus
 } from 'lucide-react';
 import { useState } from 'react';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -62,6 +64,16 @@ const menuItems = [
     icon: CheckCircle2,
   },
   {
+    title: 'Activities',
+    href: '/activities',
+    icon: ListTodo,
+  },
+  {
+    title: 'Additional Var.',
+    href: '/additional-variations',
+    icon: PackagePlus,
+  },
+  {
     title: 'Masters',
     href: '/masters',
     icon: Database,
@@ -71,6 +83,7 @@ const menuItems = [
       { title: 'Users', href: '/masters/users', icon: Users },
       { title: 'Standards', href: '/masters/standards', icon: ClipboardList },
       { title: 'Causes', href: '/masters/causes', icon: AlertTriangle },
+      { title: 'Variation Types', href: '/masters/variation-types', icon: PackagePlus },
     ],
   },
 ];
