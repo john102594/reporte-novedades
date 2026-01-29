@@ -43,7 +43,16 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, openPlans }: {
+export function TaskReviewDialog({ 
+  task, 
+  currentUser, 
+  users, 
+  onUpdate, 
+  causes, 
+  openPlans,
+  externalOpen,
+  onExternalOpenChange 
+}: {
   task: {
     id: string;
     ot: string;
@@ -79,9 +88,16 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
   users: { id: string; name: string | null; role: string }[],
   causes: { id: string; name: string }[],
   openPlans: { id: string; name: string }[],
-  onUpdate: () => void 
+  onUpdate: () => void,
+  externalOpen?: boolean,
+  onExternalOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Support both controlled and uncontrolled modes
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled ? (onExternalOpenChange ?? (() => {})) : setInternalOpen;
   const [rca, setRca] = useState(task.rootCauseAnalysis || '');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'existing' | 'new'>('existing');
@@ -256,11 +272,13 @@ export function TaskReviewDialog({ task, currentUser, users, onUpdate, causes, o
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Settings2 className="w-4 h-4 text-purple-600" /> Detalle
-        </Button>
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Settings2 className="w-4 h-4 text-purple-600" /> Detalle
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:!max-w-[1200px] !w-[95vw] h-[90vh] !p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 rounded-3xl border-slate-200 dark:border-slate-800">
         
         {/* HEADER GLOBAL */}

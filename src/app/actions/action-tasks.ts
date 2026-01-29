@@ -46,6 +46,52 @@ export async function getActionTasks() {
   return tasks;
 }
 
+export async function getActionTaskById(taskId: string) {
+  const session = await getSession();
+  if (!session) return { error: 'Unauthorized' };
+
+  const task = await prisma.actionTask.findUnique({
+    where: { id: taskId },
+    include: {
+      variationType: true,
+      variation: {
+        include: {
+          detail: {
+            include: {
+              item: {
+                include: {
+                  report: {
+                    include: {
+                      area: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      responsible: true,
+      actionPlan: {
+        include: {
+          activities: {
+            include: {
+              responsible: true
+            },
+            orderBy: { startDate: 'asc' }
+          }
+        }
+      } 
+    }
+  });
+
+  if (!task) {
+    return { error: 'Task not found' };
+  }
+
+  return { task };
+}
+
 export async function updateTaskAnalysis(taskId: string, rca: string, cause?: string) {
   const session = await getSession();
   if (!session || (session.role?.toUpperCase() !== 'COORDINATOR' && session.role?.toUpperCase() !== 'MANAGER')) {

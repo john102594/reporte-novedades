@@ -226,13 +226,14 @@ export async function saveShiftReport(data: any) {
         });
 
         const isUnprogrammed = item.operatorId === 'UNPROGRAMMED';
+        const operatorIdValue = isUnprogrammed || !item.operatorId ? null : item.operatorId;
 
         if (!dbItem) {
           dbItem = await tx.shiftReportItem.create({
             data: {
               reportId: report.id,
               machineId: item.machineId,
-              operatorId: isUnprogrammed ? null : item.operatorId,
+              operatorId: operatorIdValue,
               status: isUnprogrammed ? 'UNPROGRAMMED' : 'ACTIVE'
             }
           });
@@ -240,7 +241,7 @@ export async function saveShiftReport(data: any) {
            await tx.shiftReportItem.update({
              where: { id: dbItem.id },
              data: { 
-               operatorId: isUnprogrammed ? null : item.operatorId,
+               operatorId: operatorIdValue,
                status: isUnprogrammed ? 'UNPROGRAMMED' : 'ACTIVE'
              }
            });

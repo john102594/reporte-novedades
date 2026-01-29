@@ -8,6 +8,7 @@ import {
   updateActionPlan, 
   updateActionPlanStatus, 
   updatePlanActivity,
+  deletePlanActivity,
   assignTaskToPlan 
 } from '@/app/actions/action-plans';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,10 @@ import {
   X,
   Target,
   LayoutDashboard,
-  CircleDot
+  CircleDot,
+  Trash2,
+  Pencil,
+  ArchiveRestore
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -100,7 +104,11 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
     responsibleId?: string;
     startDate?: string;
     deadline?: string;
+    description?: string;
   }>>({});
+
+  // Track which activities are being edited
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
 
   const toggleStatus = (status: string) => {
     if (status === 'ALL') {
@@ -243,6 +251,27 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
           delete next[actId];
           return next;
       });
+      setEditingDescriptionId(null);
+  };
+
+  const handleUpdateDescription = (actId: string, value: string) => {
+      setBufferedEdits(prev => ({
+          ...prev,
+          [actId]: {
+              ...(prev[actId] || {}),
+              description: value
+          }
+      }));
+  };
+
+  const handleDeleteActivity = async (actId: string) => {
+      const res = await deletePlanActivity(actId);
+      if (res.success) {
+          toast.success('Actividad eliminada');
+          fetchPlans();
+      } else {
+          toast.error(res.error || 'Error al eliminar la actividad');
+      }
   };
 
   // Filter users for assignment (Managers/Coordinators)
@@ -500,6 +529,26 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                                           <CheckCircle2 className="w-3 h-3" /> Cerrar Plan
                                       </div>
                                   )}
+
+                                  {currentUser?.role === 'MANAGER' && plan.status === 'CERRADO' && (
+                                      <div 
+                                          role="button"
+                                          tabIndex={0}
+                                          className="inline-flex items-center h-8 px-4 rounded-lg bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 font-bold text-[11px] gap-2 border border-blue-200 cursor-pointer transition-colors"
+                                          onClick={async (e) => {
+                                              e.stopPropagation();
+                                              const res = await updateActionPlanStatus(plan.id, 'ABIERTO');
+                                              if (res.success) {
+                                                  toast.success('Plan reabierto exitosamente');
+                                                  fetchPlans();
+                                              } else {
+                                                  toast.error('Error al reabrir el plan');
+                                              }
+                                          }}
+                                      >
+                                          <ArchiveRestore className="w-3 h-3" /> Reabrir Plan
+                                      </div>
+                                  )}
                               </div>
                           </div>
                       </AccordionTrigger>
@@ -522,7 +571,31 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
 
                                           return (
                                           <TableRow key={act.id} className="group hover:bg-slate-50 transition-colors border-slate-100">
-                                              <TableCell className="font-bold text-slate-700 pl-6 text-sm">{act.description}</TableCell>
+                                              <TableCell className="font-bold text-slate-700 pl-6 text-sm">
+                                                  {editingDescriptionId === act.id ? (
+                                                      <Input
+                                                          className="h-9 text-sm bg-white border-slate-200 focus:ring-[#5C5DE5]"
+                                                          value={edits?.description ?? act.description}
+                                                          onChange={(e) => handleUpdateDescription(act.id, e.target.value)}
+                                                          onBlur={() => setEditingDescriptionId(null)}
+                                                          autoFocus
+                                                      />
+                                                  ) : (
+                                                      <div 
+                                                          className="flex items-center gap-2 cursor-pointer hover:text-[#5C5DE5] transition-colors"
+                                                          onClick={() => {
+                                                              if (currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN' || currentUser?.role === 'COORDINATOR') {
+                                                                  setEditingDescriptionId(act.id);
+                                                              }
+                                                          }}
+                                                      >
+                                                          <span>{edits?.description ?? act.description}</span>
+                                                          {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN' || currentUser?.role === 'COORDINATOR') && (
+                                                              <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                                          )}
+                                                      </div>
+                                                  )}
+                                              </TableCell>
                                               <TableCell className="text-center">
                                                   {currentUser?.role === 'MANAGER' && act.status !== 'FINALIZADA' ? (
                                                       <div className="flex items-center justify-center gap-2">
@@ -576,6 +649,7 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                                                       <Select
                                                           defaultValue={act.status}
                                                           onValueChange={(val) => handleUpdateStatus(act.id, val)}
+                                                          disabled={plan.status === 'CERRADO'}
                                                       >
                                                           <SelectTrigger className={cn(
                                                               "h-8 w-[140px] text-[10px] font-black uppercase tracking-wider rounded-lg border shadow-sm transition-all",
@@ -627,7 +701,22 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                                                               </Button>
                                                           </>
                                                       ) : (
-                                                          <div className="w-8 h-8 opacity-0 pointer-events-none" />
+                                                          <>
+                                                              {/* Delete Button - Only for managers/coordinators on non-closed plans */}
+                                                              {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN' || 
+                                                                (currentUser?.role === 'COORDINATOR' && plan.status === 'REVISION')) && 
+                                                                plan.status !== 'CERRADO' && (
+                                                                  <Button 
+                                                                      size="icon" 
+                                                                      variant="ghost" 
+                                                                      className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                      onClick={() => handleDeleteActivity(act.id)}
+                                                                      title="Eliminar actividad"
+                                                                  >
+                                                                      <Trash2 className="w-4 h-4" />
+                                                                  </Button>
+                                                              )}
+                                                          </>
                                                       )}
                                                   </div>
                                               </TableCell>

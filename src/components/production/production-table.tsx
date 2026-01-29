@@ -130,14 +130,6 @@ export function ProductionTable({
     }
   }, [machines, initialReport]);
 
-  useEffect(() => {
-      // DEBUG: Toast the counts
-      toast.info(`Debug: Received ${machines.length} machines and ${initialReport ? 'Found Report' : 'No Report'}`);
-      if (initialReport) {
-        toast.info(`Report items: ${initialReport.items?.length || 0}`);
-      }
-  }, [machines, initialReport]);
-
   const createEmptyDetail = (): Detail => ({
     ot: '',
     efficiency: '',
@@ -241,14 +233,28 @@ export function ProductionTable({
         items: items
     };
     
-    const res = await saveShiftReport(dataToSave);
-    setIsSaving(false);
-    
-    if (res.error) {
-        toast.error('Failed to save draft');
-    } else {
-        toast.success('Draft saved');
-        if (res.report && res.report.id) setReportId(res.report.id);
+    try {
+      const res = await saveShiftReport(dataToSave);
+      setIsSaving(false);
+      
+      if (res.error) {
+          toast.error('Error al guardar', {
+            description: res.error,
+            duration: 5000,
+          });
+      } else {
+          toast.success('¡Guardado exitoso!', {
+            description: 'La jornada se ha guardado correctamente.',
+            duration: 4000,
+          });
+          if (res.report && res.report.id) setReportId(res.report.id);
+      }
+    } catch (error: any) {
+      setIsSaving(false);
+      toast.error('Error al guardar', {
+        description: error?.message || 'Ocurrió un error inesperado.',
+        duration: 5000,
+      });
     }
   };
 
@@ -318,6 +324,10 @@ export function ProductionTable({
   const globalEfficiency = (totals.prodMetros > 0 ? (totals.weightedEficSum / totals.prodMetros) : 0).toFixed(1);
   const globalDesp = (totals.prodKg > 0 ? (totals.despKg / totals.prodKg) * 100 : 0).toFixed(1);
 
+  // Count programmed machines (with operator assigned, not UNPROGRAMMED)
+  const programmedMachines = items.filter(item => item.operatorId && item.operatorId !== 'UNPROGRAMMED').length;
+  const totalMachines = machines.length;
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
       {readOnly && (
@@ -338,11 +348,11 @@ export function ProductionTable({
         <table className="w-full text-[11px] border-separate border-spacing-0">
             <thead className="sticky top-0 z-20 bg-white dark:bg-zinc-950">
                 <tr className="text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider h-12">
-                    <th className="px-4 text-left border-b w-[240px]">Máquina / Operador</th>
-                    <th className="px-2 text-center border-b w-[100px]">Orden</th>
+                    <th className="px-4 text-left border-b w-[180px]">Máquina / Operador</th>
+                    <th className="px-2 text-center border-b w-[120px]">Orden</th>
                     <th className="px-2 text-center border-b w-[80px]">Eficiencia</th>
                     <th className="px-2 text-center border-b w-[180px]">Metros</th>
-                    <th className="px-2 text-center border-b w-[180px]">Kilogramos</th>
+                    <th className="px-2 text-center border-b w-[90px]">Kilogramos</th>
                     <th className="px-1 text-center border-b w-[60px]">% Desp</th>
                     <th className="px-2 text-center border-b w-[100px]">Variación</th>
                     <th className="px-4 text-left border-b">Análisis y Causa</th>
@@ -361,6 +371,7 @@ export function ProductionTable({
                             item={item} 
                             machineName={machine?.name || 'Unknown'} 
                             operators={machineOperators}
+                            causes={causes}
                             variationTypes={variationTypes}
                             onOperatorChange={handleOperatorChange}
                             onDetailChange={handleDetailChange}
@@ -386,8 +397,12 @@ export function ProductionTable({
                   <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Planta Operativa</span>
               </div>
               <div className="flex items-center gap-2 text-slate-400">
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Máquinas</span>
-                  <span className="text-xl font-black text-white">{machines.length}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Máquinas Prog.</span>
+                  <span className="text-xl font-black text-white">
+                      <span className="text-emerald-400">{programmedMachines}</span>
+                      <span className="text-slate-500 mx-1">/</span>
+                      <span>{totalMachines}</span>
+                  </span>
               </div>
           </div>
 
@@ -461,6 +476,32 @@ function DebouncedInput({ value: initialValue, onChange, delay = 300, ...props }
   );
 }
 
+// Debounced Textarea for analysis field - prevents re-renders on every keystroke
+function DebouncedTextarea({ value: initialValue, onChange, delay = 400, ...props }: any) {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (value !== initialValue) {
+        onChange(value);
+      }
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value]);
+
+  return (
+    <Textarea
+      {...props}
+      value={value}
+      onChange={e => setValue(e.target.value)}
+    />
+  );
+}
+
 // Sub-component for rendering the complex row structure
 const MachineRow = React.memo(function MachineRow({ 
     item, 
@@ -480,6 +521,54 @@ const MachineRow = React.memo(function MachineRow({
 }: any) {
     const totalRows = item.details.reduce((acc: number, d: any) => acc + Math.max(d.variations.length, 1), 0);
     const machineIdDisplay = machineName.replace(/\D/g, '') || machineName.charAt(0);
+    const isUnprogrammed = item.operatorId === 'UNPROGRAMMED';
+
+    // If machine is unprogrammed, render a single simplified row
+    if (isUnprogrammed) {
+        return (
+            <tr key={item.machineId} className="group hover:bg-slate-50/50 dark:hover:bg-zinc-900 transition-colors">
+                {/* Machine & Operator Section */}
+                <td className="p-4 border-b border-slate-100 dark:border-slate-800 align-top">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600">
+                                <span className="text-xs font-black text-slate-500 dark:text-slate-400">{machineIdDisplay}</span>
+                            </div>
+                            <span className="font-bold text-slate-400 dark:text-slate-500">{machineName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 group/op">
+                            <Select 
+                                value={item.operatorId} 
+                                onValueChange={(v) => onOperatorChange(item.machineId, v)}
+                                disabled={readOnly}
+                            >
+                                <SelectTrigger className="w-full h-8 text-[10px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-zinc-800 border-slate-300 dark:border-zinc-700 text-slate-500">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                        <SelectValue placeholder="OPERADOR" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="UNPROGRAMMED">DESPROGRAMADA</SelectItem>
+                                    {operators.map((op: any) => (
+                                        <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </td>
+                {/* Empty cells for the rest of the columns */}
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-2 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-slate-300 dark:text-slate-600 text-xs">—</td>
+                <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-slate-300 dark:text-slate-600 text-xs italic">Sin producción programada</td>
+            </tr>
+        );
+    }
 
     return (
         <React.Fragment key={item.machineId}>
@@ -536,12 +625,12 @@ const MachineRow = React.memo(function MachineRow({
                                         />
                                         {!readOnly && (
                                             <div className="flex gap-1">
-                                                <button onClick={() => onAddDetail(item.machineId)} className="p-1 text-slate-300 hover:text-primary transition-colors">
-                                                    <Plus className="w-3.5 h-3.5" />
+                                                <button onClick={() => onAddDetail(item.machineId)} className="p-1.5 rounded-md bg-emerald-100 text-emerald-600 hover:bg-emerald-200 hover:text-emerald-700 transition-colors" title="Agregar orden">
+                                                    <Plus className="w-4 h-4" />
                                                 </button>
                                                 {item.details.length > 1 && (
-                                                    <button onClick={() => onRemoveDetail(item.machineId, dIndex)} className="p-1 text-slate-300 hover:text-destructive transition-colors">
-                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    <button onClick={() => onRemoveDetail(item.machineId, dIndex)} className="p-1.5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-700 transition-colors" title="Eliminar orden">
+                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 )}
                                             </div>
@@ -631,7 +720,7 @@ const MachineRow = React.memo(function MachineRow({
                                 <Select 
                                     value={variation.variationTypeId || ''} 
                                     onValueChange={(v) => {
-                                        const selectedType = variationTypes.find(t => t.id === v);
+                                        const selectedType = variationTypes.find((t: { id: string; name: string }) => t.id === v);
                                         onVariationChange(item.machineId, dIndex, vIndex, 'variationTypeId', v === '_CLEAR_' ? '' : v);
                                         // Also update stage for legacy consistency if needed
                                         onVariationChange(item.machineId, dIndex, vIndex, 'stage', selectedType?.name || '');
@@ -649,13 +738,13 @@ const MachineRow = React.memo(function MachineRow({
                                     </SelectContent>
                                 </Select>
                                 {!readOnly && (
-                                    <div className="flex gap-1 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => onAddVariation(item.machineId, dIndex)} className="p-1 text-slate-300 hover:text-primary transition-colors">
-                                            <Plus size={12} />
+                                    <div className="flex gap-1 items-center justify-center">
+                                        <button onClick={() => onAddVariation(item.machineId, dIndex)} className="p-1.5 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 transition-colors" title="Agregar variación">
+                                            <Plus size={14} />
                                         </button>
                                         {detail.variations.length > 1 && (
-                                            <button onClick={() => onRemoveVariation(item.machineId, dIndex, vIndex)} className="p-1 text-slate-300 hover:text-destructive transition-colors">
-                                                <XCircle size={12} />
+                                            <button onClick={() => onRemoveVariation(item.machineId, dIndex, vIndex)} className="p-1.5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-700 transition-colors" title="Eliminar variación">
+                                                <XCircle size={14} />
                                             </button>
                                         )}
                                     </div>
@@ -664,24 +753,25 @@ const MachineRow = React.memo(function MachineRow({
                         </td>
 
                         {/* Analysis & Cause Section */}
-                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 align-top">
+                        <td className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 align-top">
                             <div className="flex flex-col gap-3">
-                                <Textarea 
+                                <DebouncedTextarea 
                                     value={variation.analysis} 
-                                    onChange={(e) => onVariationChange(item.machineId, dIndex, vIndex, 'analysis', e.target.value)}
+                                    onChange={(val: string) => onVariationChange(item.machineId, dIndex, vIndex, 'analysis', val)}
                                     placeholder="Escribir análisis técnico detallado..."
-                                    className="min-h-[80px] bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-xs italic shadow-none focus:border-primary/30 transition-all resize-none font-medium text-slate-500"
+                                    className="min-h-[80px] bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-xs italic shadow-none focus:border-primary/30 transition-all resize-none font-medium text-slate-900 dark:text-slate-100"
                                     disabled={readOnly}
+                                    delay={500}
                                 />
-                                <div className="flex items-center gap-2 group/cause">
-                                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">Causa:</span>
+                                <div className="flex items-center gap-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <span className="text-sm font-black text-black-700 dark:text-white tracking-wide uppercase">Causa:</span>
                                     <Select 
                                         value={variation.causeId} 
                                         onValueChange={(v) => onVariationChange(item.machineId, dIndex, vIndex, 'causeId', v)}
                                         disabled={readOnly}
                                     >
-                                        <SelectTrigger className="h-6 gap-2 border-none bg-transparent hover:bg-slate-50 dark:hover:bg-zinc-800 p-0 shadow-none text-[10px] font-bold text-primary">
-                                            <SelectValue placeholder="Click para seleccionar causa..." />
+                                        <SelectTrigger className="h-8 gap-2 border-blue-300 dark:border-blue-700 bg-white dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-3 shadow-none text-sm font-bold text-black dark:text-blue-300">
+                                            <SelectValue placeholder="Seleccionar causa..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {(causes || []).map((c: any) => (

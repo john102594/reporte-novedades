@@ -264,7 +264,7 @@ export async function getAdditionalVariations(filters?: AdditionalVariationFilte
       },
       type: true,
       createdBy: { select: { id: true, name: true } },
-      actionTask: { select: { id: true, status: true } }
+      actionTask: { select: { id: true, status: true, cause: true } }
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -289,7 +289,7 @@ export async function getAdditionalVariations(filters?: AdditionalVariationFilte
       id: ro.operator.id,
       name: ro.operator.name
     })),
-    actionTask: v.actionTask ? { id: v.actionTask.id, status: v.actionTask.status } : null
+    actionTask: v.actionTask ? { id: v.actionTask.id, status: v.actionTask.status, cause: v.actionTask.cause } : null
   }));
 }
 

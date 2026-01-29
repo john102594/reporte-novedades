@@ -32,9 +32,25 @@ export default async function VariationAnalysisRoute() {
     })
   ]);
 
+  const formattedCurrentUser = currentUser ? {
+    id: currentUser.id,
+    role: String(currentUser.role)
+  } : null;
+
+  const formattedUsers = users.map(u => ({
+    id: u.id,
+    name: u.name,
+    role: String(u.role)
+  }));
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      <ActionPlanPage currentUser={currentUser} users={users} causes={causes} openPlans={openPlans} />
+      <ActionPlanPage 
+        currentUser={formattedCurrentUser} 
+        users={formattedUsers} 
+        causes={causes} 
+        openPlans={openPlans} 
+      />
     </div>
   );
 }

@@ -23,7 +23,8 @@ model User {
   coordinatedAreas Area[] @relation("AreaCoordinators")
   managedAreas     Area[] @relation("AreaGestores")
 
-  operatedMachines Machine[] @relation("MachineOperators")
+  operatedMachines Machine[] @relation("MachineOperators") // REMOVE THIS LINK FROM USER
+  // User no longer operates machines directly on schema level compared to Operators
 
   actionPlans ActionPlan[] // Tasks assigned to this user
   actionTasks ActionTask[]   @relation("TaskResponsible")
@@ -38,19 +39,36 @@ model User {
   shiftReports ShiftReport[]
 
   // Additional Variations relations
-  createdVariations            AdditionalVariation[]         @relation("VariationCreator")
+  createdVariations AdditionalVariation[] @relation("VariationCreator")
+}
+
+model Operator {
+  id     String @id @default(uuid())
+  name   String
+  status String @default("ACTIVE") // ACTIVE, INACTIVE
+
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  operatedMachines             Machine[]                     @relation("MachineOperators")
+  shiftReportItems             ShiftReportItem[]
   assignedAdditionalVariations AdditionalVariationOperator[] @relation("AdditionalVariationOperators")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Area {
   id   String @id @default(uuid())
   name String @unique // Extrusion, Printing, etc.
 
-  machines     Machine[]
-  coordinators User[]           @relation("AreaCoordinators")
-  gestores     User[]           @relation("AreaGestores")
-  programs     FailureProgram[]
-  shiftReports ShiftReport[]
+  machines             Machine[]
+  operators            Operator[]
+  coordinators         User[]                @relation("AreaCoordinators")
+  gestores             User[]                @relation("AreaGestores")
+  programs             FailureProgram[]
+  shiftReports         ShiftReport[]
+  additionalVariations AdditionalVariation[]
 }
 
 model Machine {
@@ -59,12 +77,14 @@ model Machine {
   areaId String
   area   Area   @relation(fields: [areaId], references: [id])
 
-  operators User[] @relation("MachineOperators")
+  operators Operator[] @relation("MachineOperators")
 
   standards        Standard[]
   orders           ProductionOrder[]
   shiftReportItems ShiftReportItem[]
   shiftReports     ShiftReport[]
+  user             User?             @relation(fields: [userId], references: [id])
+  userId           String?
 }
 
 model FailureProgram {
@@ -179,11 +199,13 @@ model ShiftReportItem {
   machine   Machine @relation(fields: [machineId], references: [id])
 
   operatorId String?
-  operator   User?   @relation(fields: [operatorId], references: [id])
+  operator   Operator? @relation(fields: [operatorId], references: [id])
 
   status String @default("ACTIVE") // ACTIVE, UNPROGRAMMED
 
   details ShiftReportDetail[]
+  user    User?               @relation(fields: [userId], references: [id])
+  userId  String?
 }
 
 model ShiftReportDetail {
@@ -320,6 +342,10 @@ model AdditionalVariation {
   description String? // Descripción/Justificación
   status      String  @default("PENDIENTE") // PENDIENTE, EN_ANALISIS, RESUELTO
 
+  // Link to Area (Required for filtering Operators and Isolation)
+  areaId String?
+  area   Area?   @relation(fields: [areaId], references: [id])
+
   // Trazabilidad
   createdById String
   createdBy   User   @relation("VariationCreator", fields: [createdById], references: [id])
@@ -340,7 +366,7 @@ model AdditionalVariationOperator {
   variationId String
   variation   AdditionalVariation @relation(fields: [variationId], references: [id], onDelete: Cascade)
   operatorId  String
-  operator    User                @relation("AdditionalVariationOperators", fields: [operatorId], references: [id])
+  operator    Operator            @relation("AdditionalVariationOperators", fields: [operatorId], references: [id])
 
   @@unique([variationId, operatorId])
 }

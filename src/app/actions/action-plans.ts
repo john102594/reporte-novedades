@@ -172,15 +172,34 @@ export async function createPlanActivity(planId: string, data: { description: st
   }
 }
 
-export async function updatePlanActivity(activityId: string, data: { status?: string, startDate?: string, deadline?: string, responsibleId?: string }) {
+export async function updatePlanActivity(activityId: string, data: { 
+  status?: string, 
+  startDate?: string, 
+  deadline?: string, 
+  responsibleId?: string,
+  description?: string 
+}) {
     const session = await getSession();
     if (!session) return { error: 'Unauthorized' };
   
     try {
+      // Get activity to check plan status
+      const existingActivity = await prisma.planActivity.findUnique({
+        where: { id: activityId },
+        include: { plan: { select: { status: true } } }
+      });
+
+      if (!existingActivity) return { error: 'Activity not found' };
+
+      // Cannot modify activities of closed plans
+      if (existingActivity.plan.status === 'CERRADO') {
+        return { error: 'No se pueden modificar actividades de un plan cerrado.' };
+      }
+
       const updateData: any = {};
       if (data.status) updateData.status = data.status;
       
-      // Only Managers can update dates and responsible
+      // Only Managers/Admin can update dates, responsible, and description
       if (data.startDate && (session.role === 'MANAGER' || session.role === 'ADMIN')) {
           updateData.startDate = new Date(data.startDate);
       }
@@ -189,6 +208,9 @@ export async function updatePlanActivity(activityId: string, data: { status?: st
       }
       if (data.responsibleId && (session.role === 'MANAGER' || session.role === 'ADMIN')) {
           updateData.responsibleId = data.responsibleId;
+      }
+      if (data.description !== undefined && (session.role === 'MANAGER' || session.role === 'ADMIN' || session.role === 'COORDINATOR')) {
+          updateData.description = data.description;
       }
 
       const activity = await prisma.planActivity.update({
@@ -207,6 +229,49 @@ export async function updatePlanActivity(activityId: string, data: { status?: st
       console.error('Error updating activity:', error);
       return { error: 'Failed to update activity' };
     }
+}
+
+export async function deletePlanActivity(activityId: string) {
+  const session = await getSession();
+  if (!session || (session.role !== 'MANAGER' && session.role !== 'ADMIN' && session.role !== 'COORDINATOR')) {
+    return { error: 'Unauthorized' };
+  }
+
+  try {
+    // Get activity to check plan status and get planId
+    const activity = await prisma.planActivity.findUnique({
+      where: { id: activityId },
+      include: { plan: { select: { status: true } } }
+    });
+
+    if (!activity) return { error: 'Activity not found' };
+
+    // Cannot delete activities from closed plans
+    if (activity.plan.status === 'CERRADO') {
+      return { error: 'No se pueden eliminar actividades de un plan cerrado.' };
+    }
+
+    // Only Managers can delete from approved plans
+    if (activity.plan.status === 'ABIERTO' && session.role !== 'MANAGER' && session.role !== 'ADMIN') {
+      return { error: 'Solo los managers pueden eliminar actividades de un plan aprobado.' };
+    }
+
+    const planId = activity.planId;
+
+    // Delete the activity
+    await prisma.planActivity.delete({
+      where: { id: activityId }
+    });
+
+    // Recalculate plan dates
+    await syncPlanDates(prisma, planId);
+
+    revalidatePath('/action-plans');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting activity:', error);
+    return { error: 'Failed to delete activity' };
+  }
 }
 
 export async function updateActionPlan(planId: string, data: {

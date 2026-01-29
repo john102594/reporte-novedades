@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getSession } from "@/app/actions/auth";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,6 +39,7 @@ export default async function RootLayout({
               {children}
             </div>
           </main>
+          <Toaster richColors position="bottom-right" />
         </ThemeProvider>
       </body>
     </html>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,15 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Eye, Users, Package, Calendar, User, ExternalLink } from 'lucide-react';
+import { Eye, Users, Package, Calendar, User, ExternalLink, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import Link from 'next/link';
 import {
   updateAdditionalVariation,
   type VariationStatus
 } from '@/app/actions/additional-variations';
+import { getActionTaskById } from '@/app/actions/action-tasks';
+import { TaskReviewDialog } from '@/components/variation-analysis/task-review-dialog';
 
 interface VariationType {
   id: string;
@@ -53,12 +55,16 @@ interface AdditionalVariation {
   updatedAt: string;
   createdBy: { id: string; name: string | null } | null;
   responsibleOperators: Operator[];
-  actionTask: { id: string; status: string } | null;
+  actionTask: { id: string; status: string; cause: string | null } | null;
 }
 
 interface VariationListProps {
   variations: AdditionalVariation[];
   onRefresh: () => void;
+  currentUser: { id: string; role: string } | null;
+  users: { id: string; name: string | null; role: string }[];
+  causes: { id: string; name: string }[];
+  openPlans: { id: string; name: string }[];
 }
 
 const statusLabels: Record<VariationStatus, string> = {
@@ -73,9 +79,14 @@ const statusColors: Record<VariationStatus, string> = {
   RESUELTO: 'bg-green-100 text-green-700'
 };
 
-export function VariationList({ variations, onRefresh }: VariationListProps) {
+export function VariationList({ variations, onRefresh, currentUser, users, causes, openPlans }: VariationListProps) {
   const [selectedVariation, setSelectedVariation] = useState<AdditionalVariation | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Task Review Dialog State
+  const [taskReviewOpen, setTaskReviewOpen] = useState(false);
+  const [loadingTask, setLoadingTask] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
 
   const handleStatusChange = async (id: string, newStatus: VariationStatus) => {
     setIsUpdating(true);
@@ -117,6 +128,7 @@ export function VariationList({ variations, onRefresh }: VariationListProps) {
               <TableRow className="bg-slate-50">
                 <TableHead className="font-bold">OT</TableHead>
                 <TableHead className="font-bold">Tipo</TableHead>
+                <TableHead className="font-bold">Causa</TableHead>
                 <TableHead className="font-bold text-right">Cantidad</TableHead>
                 <TableHead className="font-bold">Operadores</TableHead>
                 <TableHead className="font-bold">Estado</TableHead>
@@ -135,6 +147,13 @@ export function VariationList({ variations, onRefresh }: VariationListProps) {
                     <Badge variant="outline" className="border text-xs">
                       {variation.type.name}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {variation.actionTask?.cause ? (
+                      <span className="text-sm text-slate-700">{variation.actionTask.cause}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Sin causa</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-bold">
                     {variation.quantity.toLocaleString()} <span className="text-slate-400 font-normal">kg</span>
@@ -223,11 +242,19 @@ export function VariationList({ variations, onRefresh }: VariationListProps) {
                 </div>
               </div>
 
-              <div>
-                <p className="text-xs font-bold uppercase text-slate-400 mb-1">Estado</p>
-                <Badge className={statusColors[selectedVariation.status]}>
-                  {statusLabels[selectedVariation.status]}
-                </Badge>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase text-slate-400 mb-1">Estado</p>
+                  <Badge className={statusColors[selectedVariation.status]}>
+                    {statusLabels[selectedVariation.status]}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase text-slate-400 mb-1">Causa</p>
+                  <p className="text-sm font-medium">
+                    {selectedVariation.actionTask?.cause || <span className="text-slate-400 italic">Sin causa asignada</span>}
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -256,13 +283,39 @@ export function VariationList({ variations, onRefresh }: VariationListProps) {
                   <p className="text-xs font-bold uppercase text-primary mb-1">Tarea de Seguimiento</p>
                   <div className="flex items-center justify-between">
                     <Badge variant="outline">{selectedVariation.actionTask.status}</Badge>
-                    <Link 
-                      href="/variation-analysis" 
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-sm text-primary hover:underline flex items-center gap-1 p-0 h-auto"
+                      disabled={loadingTask}
+                      onClick={async () => {
+                        if (!selectedVariation.actionTask?.id) return;
+                        setLoadingTask(true);
+                        try {
+                          const result = await getActionTaskById(selectedVariation.actionTask.id);
+                          if ('error' in result) {
+                            toast.error('No se pudo cargar la tarea');
+                          } else {
+                            setSelectedTask(result.task);
+                            setSelectedVariation(null); // Close detail dialog
+                            setTaskReviewOpen(true);
+                          }
+                        } catch (error) {
+                          toast.error('Error al cargar la tarea');
+                        } finally {
+                          setLoadingTask(false);
+                        }
+                      }}
                     >
-                      Ver en análisis
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
+                      {loadingTask ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <>
+                          Ver en análisis
+                          <ExternalLink className="w-3 h-3" />
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               )}
@@ -289,6 +342,27 @@ export function VariationList({ variations, onRefresh }: VariationListProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Task Review Dialog - Opens when clicking "Ver en análisis" */}
+      {selectedTask && (
+        <TaskReviewDialog
+          task={selectedTask}
+          currentUser={currentUser}
+          users={users}
+          causes={causes}
+          openPlans={openPlans}
+          onUpdate={() => {
+            setTaskReviewOpen(false);
+            setSelectedTask(null);
+            onRefresh();
+          }}
+          externalOpen={taskReviewOpen}
+          onExternalOpenChange={(open) => {
+            setTaskReviewOpen(open);
+            if (!open) setSelectedTask(null);
+          }}
+        />
+      )}
     </>
   );
 }

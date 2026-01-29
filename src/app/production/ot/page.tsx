@@ -11,7 +11,7 @@ import Link from 'next/link';
 export default function OTSearchPage() {
   const [otNumber, setOtNumber] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<any[] | null>(null);
+  const [results, setResults] = useState<{ details: any[]; additionalVariations: any[] } | null>(null);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -22,9 +22,9 @@ export default function OTSearchPage() {
     setIsSearching(false);
 
     if (res.success) {
-      setResults(res.data || []);
+      setResults(res.data);
     } else {
-      setResults([]);
+      setResults({ details: [], additionalVariations: [] });
     }
   };
 
@@ -78,8 +78,8 @@ export default function OTSearchPage() {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-foreground">
-              {results.length > 0 
-                ? `${results.length} reporte(s) encontrado(s)` 
+              {(results.details?.length > 0 || results.additionalVariations?.length > 0)
+                ? `${(results.details?.length || 0) + (results.additionalVariations?.length || 0)} reporte(s) encontrado(s)` 
                 : 'Sin resultados'}
             </h2>
           </div>

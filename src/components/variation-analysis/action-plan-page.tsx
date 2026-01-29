@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TaskReviewDialog } from './task-review-dialog';
-import { ClipboardList, CheckCircle2, AlertCircle, Clock, Filter } from 'lucide-react';
+import { ClipboardList, CheckCircle2, AlertCircle, Clock, Filter, X } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface ActionTask {
   id: string;
@@ -43,9 +44,37 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
   causes: { id: string; name: string }[],
   openPlans: { id: string; name: string }[]
 }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const initialOt = searchParams.get('ot');
+  const initialTaskId = searchParams.get('taskId');
+
   const [tasks, setTasks] = useState<ActionTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [searchOt, setSearchOt] = useState(initialOt || '');
+  const [activeTaskId, setActiveTaskId] = useState(initialTaskId || null);
+
+  // Update params when URL changes
+  useEffect(() => {
+    setSearchOt(searchParams.get('ot') || '');
+    setActiveTaskId(searchParams.get('taskId') || null);
+  }, [searchParams]);
+
+  const clearSearch = () => {
+    setSearchOt('');
+    setActiveTaskId(null);
+    router.push('/variation-analysis');
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+        // Remove taskId from URL but keep other state if needed, or just clear all
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.delete('taskId');
+        router.push(`/variation-analysis?${newParams.toString()}`);
+    }
+  };
 
   const fetchTasks = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -60,7 +89,14 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
     fetchTasks();
   }, []);
 
-  const filteredTasks = tasks.filter(t => {      
+  const filteredTasks = tasks.filter(t => {
+    // If specific task ID is requested, only show that one (or at least ensure it's included)
+    if (activeTaskId) return t.id === activeTaskId;
+
+    // Filter by OT if present
+    if (searchOt && !t.ot.includes(searchOt)) return false;
+    
+    // Filter by Status
     if (filter === 'ALL') return true;
     return t.status === filter;
   });
@@ -131,7 +167,23 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
             En Plan
           </Button>
         </div>
-      </div>
+        </div>
+
+      {(searchOt || activeTaskId) && (
+        <div className="flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg w-fit animate-in fade-in slide-in-from-left-4">
+             <span className="text-xs font-bold text-purple-700 dark:text-purple-300 pl-2">
+                {activeTaskId ? 'Viendo Tarea Específica' : `Filtrando por OT: ${searchOt}`}
+             </span>
+             <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 rounded-full hover:bg-purple-100 dark:hover:bg-purple-800"
+                onClick={clearSearch}
+             >
+                <X className="w-3 h-3 text-purple-700" />
+             </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
@@ -198,6 +250,8 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
                       causes={causes}
                       openPlans={openPlans}
                       onUpdate={() => fetchTasks(false)} 
+                      externalOpen={activeTaskId === task.id}
+                      onExternalOpenChange={handleDialogClose}
                     />
                   </TableCell>
                 </TableRow>

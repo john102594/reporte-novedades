@@ -193,26 +193,23 @@ export function VariationForm({ onSuccess }: VariationFormProps) {
               No hay tipos de variación configurados. Contacte al administrador.
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {variationTypes.map(type => (
-                <button
-                  key={type.id}
-                  onClick={() => setSelectedTypeId(type.id)}
-                  className={`
-                    p-3 rounded-lg border-2 transition-all text-sm font-medium text-left
-                    ${selectedTypeId === type.id 
-                      ? 'border-primary bg-primary/5 text-primary' 
-                      : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                    }
-                  `}
-                >
-                  <div className="font-bold">{type.name}</div>
-                  {type.description && (
-                    <div className="text-xs text-slate-400 mt-1">{type.description}</div>
-                  )}
-                </button>
-              ))}
-            </div>
+            <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccione un tipo de variación" />
+              </SelectTrigger>
+              <SelectContent>
+                {variationTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    <div className="flex flex-col items-start gap-1 py-1">
+                      <span className="font-medium">{type.name}</span>
+                      {type.description && (
+                        <span className="text-xs text-slate-400">{type.description}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
 

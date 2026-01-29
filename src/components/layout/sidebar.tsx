@@ -44,15 +44,12 @@ const menuItems = [
     icon: Search,
   },
   {
-    title: 'Kanban',
-    href: '/kanban',
-    icon: ClipboardList,
-  },
-  {
     title: 'Analytics',
     href: '/analytics',
     icon: BarChart3,
   },
+
+
   {
     title: 'Variation Analysis',
     href: '/variation-analysis',
