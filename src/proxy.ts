@@ -23,9 +23,14 @@ export function proxy(request: NextRequest) {
   const userData = JSON.parse(session.value);
   const role = userData.role;
 
-  // Protect /masters routes - Only MANAGER (Admin) can access
-  if (pathname.startsWith('/masters') && role !== 'MANAGER') {
-    return NextResponse.redirect(new URL('/production', request.url)); // Redirect to home/production
+  // Block /masters/areas for non-ADMIN (ABAC restriction)
+  if (pathname === '/masters/areas' && role !== 'ADMIN') {
+    return NextResponse.redirect(new URL('/masters/machines', request.url));
+  }
+
+  // Protect /masters routes - Only MANAGER, ADMIN, COORDINATOR can access
+  if (pathname.startsWith('/masters') && !['MANAGER', 'ADMIN', 'COORDINATOR'].includes(role)) {
+    return NextResponse.redirect(new URL('/production', request.url));
   }
 
   return NextResponse.next();

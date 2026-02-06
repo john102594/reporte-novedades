@@ -77,6 +77,7 @@ const menuItems = [
     submenu: [
       { title: 'Areas', href: '/masters/areas', icon: Factory },
       { title: 'Machines', href: '/masters/machines', icon: Settings },
+      { title: 'Operators', href: '/masters/operators', icon: Users },
       { title: 'Users', href: '/masters/users', icon: Users },
       { title: 'Standards', href: '/masters/standards', icon: ClipboardList },
       { title: 'Causes', href: '/masters/causes', icon: AlertTriangle },
@@ -98,12 +99,32 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  // Filter menu items based on role
-  // Only MANAGER sees Masters
-  const filteredMenu = menuItems.filter(item => {
+  const toggleGroup = (title: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(title) ? prev.filter(t => t !== title) : [...prev, title]
+    );
+  };
+
+  // Filter menu items based on role (RBAC + ABAC)
+  const filteredMenu = menuItems.map(item => {
+    // Filter submenu items for Masters
+    if (item.title === 'Masters' && item.submenu) {
+      const filteredSubmenu = item.submenu.filter(sub => {
+        // Only ADMIN can see Areas
+        if (sub.title === 'Areas') {
+          return user?.role === 'ADMIN';
+        }
+        return true;
+      });
+      return { ...item, submenu: filteredSubmenu };
+    }
+    return item;
+  }).filter(item => {
+    // Masters visible to MANAGER, ADMIN, COORDINATOR
     if (item.title === 'Masters') {
-      return user?.role === 'MANAGER';
+      return user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.role === 'COORDINATOR';
     }
     if (item.title === 'Prod. Summary') {
       const allowed = ['MANAGER', 'ADMIN', 'COORDINATOR', 'GESTOR'];
@@ -144,6 +165,12 @@ export function Sidebar({ user }: SidebarProps) {
             <div key={item.href}>
               <Link
                 href={item.submenu ? item.submenu[0].href : item.href}
+                onClick={(e) => {
+                   if (item.submenu) {
+                       e.preventDefault();
+                       toggleGroup(item.title);
+                   }
+                }}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden",
                   isActive 
@@ -159,7 +186,7 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
 
               {/* Submenu */}
-              {item.submenu && isActive && !collapsed && (
+              {item.submenu && (isActive || expandedGroups.includes(item.title)) && !collapsed && (
                 <div className="ml-4 mt-2 space-y-1 border-l border-border/50 pl-3">
                   {item.submenu.map((sub) => (
                     <Link

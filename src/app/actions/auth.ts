@@ -66,3 +66,34 @@ export async function getSession() {
     return null;
   }
 }
+
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session || !session.userId) return null;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      include: {
+        managedAreas: true,
+        coordinatedAreas: true
+      }
+    });
+
+    if (!user) return null;
+
+    // Helper to get all allowed areas (managed + coordinated)
+    const allowedAreas = [
+        ...user.managedAreas,
+        ...user.coordinatedAreas
+    ];
+    
+    // Remove duplicates
+    const uniqueAreas = Array.from(new Map(allowedAreas.map(item => [item.id, item])).values());
+
+    return { ...user, allowedAreas: uniqueAreas };
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    return null;
+  }
+}

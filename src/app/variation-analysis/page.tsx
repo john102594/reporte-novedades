@@ -2,6 +2,7 @@ import { getSession } from '@/app/actions/auth';
 import prisma from '@/lib/prisma';
 import ActionPlanPage from '@/components/variation-analysis/action-plan-page';
 import { redirect } from 'next/navigation';
+import { getAllowedAreaIds } from '@/lib/abac';
 
 export const metadata = {
   title: 'Análisis de Variaciones - FlexFlow',
@@ -11,6 +12,8 @@ export default async function VariationAnalysisRoute() {
   const session = await getSession();
   if (!session) redirect('/login');
 
+  const allowedAreaIds = await getAllowedAreaIds();
+
   const [currentUser, users, causes, openPlans] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
@@ -18,7 +21,13 @@ export default async function VariationAnalysisRoute() {
     }),
     prisma.user.findMany({
       where: {
-        role: { in: ['MANAGER', 'COORDINATOR'] }
+        role: { in: ['MANAGER', 'COORDINATOR'] },
+        ...(allowedAreaIds ? {
+          OR: [
+            { managedAreas: { some: { id: { in: allowedAreaIds } } } },
+            { coordinatedAreas: { some: { id: { in: allowedAreaIds } } } }
+          ]
+        } : {})
       },
       select: { id: true, name: true, role: true }
     }),
@@ -28,7 +37,7 @@ export default async function VariationAnalysisRoute() {
     }),
     prisma.actionPlan.findMany({
       where: { status: 'ABIERTO' },
-      select: { id: true, name: true }
+      select: { id: true, name: true, areaId: true }
     })
   ]);
 

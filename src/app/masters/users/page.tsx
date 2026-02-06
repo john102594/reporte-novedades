@@ -11,15 +11,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function UsersPage() {
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { managedAreas: true }
-  });
+  /* REMOVED: prisma import not needed for areas if using allowedAreas from session/user logic handled in page component or passed down */
+/* BUT actually I need getOperators or getUsers equivalent... wait, current users page calls prisma directly? YES. */
+/* I need to call getUsers() instead of prisma.user.findMany to respect filtering */
+import { getUsers } from '@/app/actions/users';
+import { getCurrentUser } from '@/app/actions/auth';
+import { redirect } from 'next/navigation';
 
-  const areas = await prisma.area.findMany({
-    orderBy: { name: 'asc' }
-  });
+export default async function UsersPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect('/login');
+
+  const users = await getUsers();
+  
+  // Admin sees all areas for assignment? getUsers returns filtered users.
+  // For the Dialog (Create User), we pass allowedAreas.
+  // Admin needs ALL areas for the dialog.
+  
+  let areasForDialog = currentUser.allowedAreas;
+  if (currentUser.role === 'ADMIN') {
+      areasForDialog = await prisma.area.findMany({ orderBy: { name: 'asc' } });
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -28,7 +40,7 @@ export default async function UsersPage() {
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent mb-2">Team Management</h1>
           <p className="text-muted-foreground">Manage roles, permissions, and shift assignments.</p>
         </div>
-        <UserDialog areas={areas} />
+        <UserDialog areas={areasForDialog} currentUserRole={currentUser.role} />
       </div>
 
       <div className="rounded-md border border-border bg-card">
@@ -64,7 +76,7 @@ export default async function UsersPage() {
                 </TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
                 <TableCell className="text-right">
-                  <UserActions user={user} areas={areas} />
+                  <UserActions user={user} areas={areasForDialog} currentUserRole={currentUser.role} />
                 </TableCell>
               </TableRow>
             ))}

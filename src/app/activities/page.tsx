@@ -1,4 +1,5 @@
 import { getSession } from '@/app/actions/auth';
+import { getAllowedAreaIds } from '@/lib/abac';
 import prisma from '@/lib/prisma';
 import ActivitiesView from '@/components/activities/activities-view';
 import { redirect } from 'next/navigation';
@@ -9,11 +10,28 @@ export default async function ActivitiesPage() {
     redirect('/login');
   }
 
+
+  const allowedAreaIds = await getAllowedAreaIds();
+  const whereUser: any = {
+    role: { in: ['MANAGER', 'COORDINATOR'] }
+  };
+
+  if (allowedAreaIds) {
+    whereUser.OR = [
+      { managedAreas: { some: { id: { in: allowedAreaIds } } } },
+      { coordinatedAreas: { some: { id: { in: allowedAreaIds } } } }
+    ];
+  }
+
   const users = await prisma.user.findMany({
-    where: {
-      role: { in: ['MANAGER', 'COORDINATOR'] }
-    },
-    select: { id: true, name: true, role: true }
+    where: whereUser,
+    select: { 
+      id: true, 
+      name: true, 
+      role: true,
+      managedAreas: { select: { id: true } },
+      coordinatedAreas: { select: { id: true } }
+    }
   });
 
   // Check if current user is in the assignable users list

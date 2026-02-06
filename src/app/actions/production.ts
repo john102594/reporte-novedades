@@ -5,6 +5,21 @@ import { revalidatePath } from 'next/cache';
 
 import { getSession } from './auth';
 
+async function checkAreaAccess(areaId: string) {
+    const session = await getSession();
+    if (!session) return false;
+    if (session.role === 'ADMIN') return true;
+    
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        include: { managedAreas: true, coordinatedAreas: true }
+    });
+    
+    if (!user) return false;
+    const allowed = [...user.managedAreas, ...user.coordinatedAreas];
+    return allowed.some(a => a.id === areaId);
+}
+
 export interface ProductionContext {
   machines: { id: string; name: string; operators: { id: string; name: string | null }[] }[];
   causes: { id: string; name: string }[];
@@ -13,6 +28,11 @@ export interface ProductionContext {
 }
 
 export async function getProductionContext(areaId: string): Promise<ProductionContext> {
+  const hasAccess = await checkAreaAccess(areaId);
+  if (!hasAccess) {
+      throw new Error('Unauthorized access to this area');
+  }
+
   const [machines, causes, operators, variationTypes] = await Promise.all([
     prisma.machine.findMany({
       where: { areaId },
@@ -31,9 +51,10 @@ export async function getProductionContext(areaId: string): Promise<ProductionCo
       select: { id: true, name: true },
       orderBy: { name: 'asc' }
     }),
-    prisma.user.findMany({
+    prisma.operator.findMany({
       where: { 
-        role: 'OPERATOR',
+        areaId: areaId,
+        status: 'ACTIVE'
       },
       select: { id: true, name: true },
       orderBy: { name: 'asc' }
@@ -42,7 +63,12 @@ export async function getProductionContext(areaId: string): Promise<ProductionCo
       where: { 
         category: 'OPERATIVA',
         isActive: true,
-        visibleToGestor: true
+        visibleToGestor: true,
+        // Filter by area: global types (no areas) OR types assigned to this area
+        OR: [
+          { areas: { none: {} } }, // Global types (no areas assigned)
+          { areas: { some: { areaId } } } // Types assigned to this specific area
+        ]
       },
       select: { id: true, name: true, code: true },
       orderBy: { sortOrder: 'asc' }
@@ -83,6 +109,9 @@ export async function getProductionContext(areaId: string): Promise<ProductionCo
 }
 
 export async function getShiftReport(areaId: string, date: string, shift: string) {
+  const hasAccess = await checkAreaAccess(areaId);
+  if (!hasAccess) return null; // Or throw
+
   // We used to do new Date(date) but that creates timezone issues.
   // Since we want to match EXACTLY the date string YYYY-MM-DD or specific stored instant.
   // The 'date' in database is DateTime. Prisma stores as UTC.

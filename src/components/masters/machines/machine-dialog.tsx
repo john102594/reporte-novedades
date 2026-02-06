@@ -36,7 +36,7 @@ interface Machine {
 interface Operator {
   id: string;
   name: string | null;
-  managedAreas: { id: string }[];
+  areaId: string;
 }
 
 export function MachineDialog({ areas, operators = [], machineToEdit }: { areas: Area[], operators?: Operator[], machineToEdit?: Machine }) {
@@ -77,9 +77,9 @@ export function MachineDialog({ areas, operators = [], machineToEdit }: { areas:
     }
   }
 
-  // Filter available operators: belong to area AND not already assigned
+  // Filter available operators: belong to selected area AND not already assigned
   const availableOperators = operators.filter(op => 
-    op.managedAreas.some(area => area.id === selectedAreaId) &&
+    op.areaId === selectedAreaId &&
     !assignedOperators.some(assigned => assigned.id === op.id)
   );
 

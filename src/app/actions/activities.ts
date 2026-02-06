@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getSession } from './auth';
+import { getAllowedAreaIds } from '@/lib/abac';
 
 interface ActivityFilters {
   status?: string;
@@ -24,6 +25,35 @@ export async function getAllActivities(filters?: ActivityFilters) {
       where.responsibleId = filters.responsibleId;
     }
 
+    // ABAC: Filter activities by plan's linked tasks that belong to user's allowed areas
+    const allowedAreaIds = await getAllowedAreaIds();
+    if (allowedAreaIds !== null) {
+      where.plan = {
+        tasks: {
+          some: {
+            OR: [
+              {
+                variation: {
+                  detail: {
+                    item: {
+                      report: {
+                        areaId: { in: allowedAreaIds }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                additionalVariation: {
+                  areaId: { in: allowedAreaIds }
+                }
+              }
+            ]
+          }
+        }
+      };
+    }
+
     const activities = await prisma.planActivity.findMany({
       where,
       include: {
@@ -31,7 +61,38 @@ export async function getAllActivities(filters?: ActivityFilters) {
           select: { id: true, name: true, role: true }
         },
         plan: {
-          select: { id: true, name: true, status: true, priority: true }
+          select: { 
+            id: true, 
+            name: true, 
+            status: true, 
+            priority: true,
+            tasks: {
+              select: {
+                variation: {
+                  select: {
+                    detail: {
+                      select: {
+                        item: {
+                          select: {
+                            report: {
+                              select: {
+                                areaId: true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                additionalVariation: {
+                  select: {
+                    areaId: true
+                  }
+                }
+              }
+            }
+          }
         }
       },
       orderBy: [

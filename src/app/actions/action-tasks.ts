@@ -3,12 +3,39 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getSession } from './auth';
+import { getAllowedAreaIds } from '@/lib/abac';
 
 export async function getActionTasks() {
   const session = await getSession();
   if (!session) return { error: 'Unauthorized' };
 
+  // Build where clause for isolation
+  const where: any = {};
+  const allowedIds = await getAllowedAreaIds();
+  
+  if (allowedIds !== null) {
+      where.OR = [
+        {
+          variation: {
+            detail: {
+              item: {
+                report: {
+                  areaId: { in: allowedIds }
+                }
+              }
+            }
+          }
+        },
+        {
+          additionalVariation: {
+            areaId: { in: allowedIds }
+          }
+        }
+      ];
+  }
+
   const tasks = await prisma.actionTask.findMany({
+    where,
     include: {
       variationType: true,
       variation: {
@@ -18,14 +45,19 @@ export async function getActionTasks() {
               item: {
                 include: {
                   report: {
-                    include: {
-                      area: true
+                    select: {
+                      areaId: true
                     }
                   }
                 }
               }
             }
           }
+        }
+      },
+      additionalVariation: {
+        select: {
+          areaId: true
         }
       },
       responsible: true,
@@ -43,7 +75,11 @@ export async function getActionTasks() {
     orderBy: { createdAt: 'desc' }
   });
 
-  return tasks;
+  // Map to include areaId at top level for convenience
+  return tasks.map(t => ({
+      ...t,
+      areaId: t.variation?.detail.item.report.areaId || t.additionalVariation?.areaId || null
+  }));
 }
 
 export async function getActionTaskById(taskId: string) {
@@ -71,6 +107,11 @@ export async function getActionTaskById(taskId: string) {
           }
         }
       },
+      additionalVariation: {
+        include: {
+          area: true
+        }
+      },
       responsible: true,
       actionPlan: {
         include: {
@@ -87,6 +128,24 @@ export async function getActionTaskById(taskId: string) {
 
   if (!task) {
     return { error: 'Task not found' };
+  }
+
+  // Check access for non-admin
+  const allowedIds = await getAllowedAreaIds();
+  if (allowedIds !== null) {
+    let hasAccess = false;
+    // Check operative variation area
+    if (task.variation?.detail?.item?.report?.areaId && allowedIds.includes(task.variation.detail.item.report.areaId)) {
+        hasAccess = true;
+    }
+    // Check additional variation area
+    if (task.additionalVariation?.areaId && allowedIds.includes(task.additionalVariation.areaId)) {
+        hasAccess = true;
+    }
+    
+    if (!hasAccess) {
+        return { error: 'Unauthorized: Access to this task is restricted to assigned areas.' };
+    }
   }
 
   return { task };

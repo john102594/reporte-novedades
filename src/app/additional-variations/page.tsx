@@ -1,4 +1,5 @@
-import { getSession } from '@/app/actions/auth';
+import { getSession, getCurrentUser } from '@/app/actions/auth';
+import { getOperators } from '@/app/actions/operators';
 import prisma from '@/lib/prisma';
 import AdditionalVariationsPage from '@/components/additional-variations/additional-variations-page';
 import { redirect } from 'next/navigation';
@@ -8,20 +9,11 @@ export const metadata = {
 };
 
 export default async function AdditionalVariationsRoute() {
-  const session = await getSession();
-  if (!session) redirect('/login');
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect('/login');
 
-  const [currentUser, users, causes, openPlans] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: session.userId },
-      select: { id: true, name: true, role: true }
-    }),
-    prisma.user.findMany({
-      where: {
-        role: { in: ['MANAGER', 'COORDINATOR'] }
-      },
-      select: { id: true, name: true, role: true }
-    }),
+  const [operators, causes, openPlans] = await Promise.all([
+    getOperators(),
     prisma.failureProgram.findMany({
       select: { id: true, name: true },
       orderBy: { name: 'asc' }
@@ -35,7 +27,7 @@ export default async function AdditionalVariationsRoute() {
   return (
     <AdditionalVariationsPage 
       currentUser={currentUser} 
-      users={users} 
+      operators={operators} 
       causes={causes} 
       openPlans={openPlans} 
     />

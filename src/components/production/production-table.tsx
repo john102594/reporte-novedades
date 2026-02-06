@@ -390,7 +390,7 @@ export function ProductionTable({
       </div>
 
       {/* FIXED FOOTER SUMMARY BAR */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#0f172a] text-white flex items-center justify-between px-12 z-50 border-t border-slate-800 shadow-2xl">
+      <div className="fixed bottom-0 left-[var(--sidebar-width,240px)] right-0 h-16 bg-[#0f172a] text-white flex items-center justify-between px-12 z-50 border-t border-slate-800 shadow-2xl">
           <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

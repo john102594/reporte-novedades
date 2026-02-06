@@ -23,6 +23,12 @@ interface Operator {
   id: string;
   name: string | null;
   shifts: string[];
+  areaId: string;
+}
+
+interface Area {
+  id: string;
+  name: string;
 }
 
 interface VariationType {
@@ -41,9 +47,16 @@ interface Cause {
 
 interface VariationFormProps {
   onSuccess?: () => void;
+  currentUser?: { id: string; role: string; allowedAreas: { id: string; name: string }[] } | null;
+  operators?: { id: string; name: string; areaId: string }[];
 }
 
-export function VariationForm({ onSuccess }: VariationFormProps) {
+export function VariationForm({ onSuccess, currentUser }: VariationFormProps) {
+  const allowedAreas = currentUser?.allowedAreas || [];
+  const defaultAreaId = allowedAreas.length === 1 ? allowedAreas[0].id : '';
+
+  const [selectedAreaId, setSelectedAreaId] = useState(defaultAreaId);
+  const [showAreaSelect, setShowAreaSelect] = useState(allowedAreas.length > 1);
   const [ot, setOt] = useState('');
   const [otSearched, setOtSearched] = useState(false);
   const [otValid, setOtValid] = useState(false);
@@ -95,9 +108,19 @@ export function VariationForm({ onSuccess }: VariationFormProps) {
       setOtSearched(true);
 
       if (exists) {
-        const ops = await getOperatorsByOT(ot.trim());
+        let ops = await getOperatorsByOT(ot.trim());
+        
+        // Filter by selected Area
+        if (selectedAreaId) {
+             ops = ops.filter(op => op.areaId === selectedAreaId);
+        }
+
         setOperators(ops);
-        toast.success(`OT encontrada con ${ops.length} operador(es)`);
+        if (ops.length === 0 && selectedAreaId) {
+             toast.warning(`OT encontrada, pero no tiene operadores en el área seleccionada.`);
+        } else {
+             toast.success(`OT encontrada con ${ops.length} operador(es) en el área.`);
+        }
       } else {
         toast.error('OT no encontrada en ningún reporte');
       }
@@ -117,8 +140,8 @@ export function VariationForm({ onSuccess }: VariationFormProps) {
   };
 
   const handleSubmit = async () => {
-    if (!ot.trim() || !selectedTypeId || !quantity || selectedOperators.length === 0) {
-      toast.error('Complete todos los campos requeridos');
+    if (!ot.trim() || !selectedTypeId || !quantity || selectedOperators.length === 0 || !selectedAreaId) {
+      toast.error('Complete todos los campos requeridos (incluyendo Área)');
       return;
     }
 
@@ -137,7 +160,8 @@ export function VariationForm({ onSuccess }: VariationFormProps) {
         quantity: qty,
         description: description.trim() || undefined,
         causeId: selectedCauseId || undefined,
-        operatorIds: selectedOperators
+        operatorIds: selectedOperators,
+        areaId: selectedAreaId
       });
 
       if (result.error) {
@@ -177,6 +201,29 @@ export function VariationForm({ onSuccess }: VariationFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Area Selection (if multiple) */}
+        {showAreaSelect && (
+            <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Área *
+                </Label>
+                <Select value={selectedAreaId} onValueChange={(val) => {
+                    setSelectedAreaId(val);
+                    setOperators([]); // Reset ops on area change
+                    setOtSearched(false);
+                }}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Seleccione Área" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {allowedAreas.map(area => (
+                            <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+
         {/* Tipo de Variación */}
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">

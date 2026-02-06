@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { getAllowedAreaIds, getAllowedAreas } from '@/lib/abac';
 import { ProgramDialog } from '@/components/masters/causes/program-dialog';
 import { ProgramActions } from '@/components/masters/causes/program-actions';
 import { Badge } from '@/components/ui/badge';
@@ -13,12 +14,17 @@ import {
 } from "@/components/ui/table";
 
 export default async function CausesPage() {
+  // ABAC: Get user's allowed area IDs
+  const allowedAreaIds = await getAllowedAreaIds();
+  
   const programs = await prisma.failureProgram.findMany({
+    where: allowedAreaIds ? { areaId: { in: allowedAreaIds } } : {},
     include: { area: true },
     orderBy: { area: { name: 'asc' } }
   });
   
-  const areas = await prisma.area.findMany({ select: { id: true, name: true } });
+  // Get only allowed areas (for dropdown)
+  const areas = await getAllowedAreas();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

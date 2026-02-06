@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getSession } from './auth';
+import { getAllowedAreaIds } from '@/lib/abac';
 
 // --- Action Plans ---
 
@@ -31,7 +32,43 @@ export async function getActionPlans() {
   if (!session) return { error: 'Unauthorized' };
 
   try {
+    // Build where clause for ABAC filtering
+    const allowedAreaIds = await getAllowedAreaIds();
+    let where: any = {};
+    
+    // Filter plans by linked tasks that belong to user's allowed areas OR plans created by the user
+    if (allowedAreaIds !== null) {
+      where.OR = [
+        {
+          tasks: {
+            some: {
+              OR: [
+                {
+                  variation: {
+                    detail: {
+                      item: {
+                        report: {
+                          areaId: { in: allowedAreaIds }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  additionalVariation: {
+                    areaId: { in: allowedAreaIds }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        { userId: session.userId }
+      ];
+    }
+
     const plans = await prisma.actionPlan.findMany({
+      where,
       include: {
         activities: {
           include: {
@@ -40,7 +77,31 @@ export async function getActionPlans() {
           orderBy: { startDate: 'asc' }
         },
         tasks: {
-          select: { ot: true } // Just to show linked OTs
+          select: { 
+            ot: true,
+            variation: {
+              select: {
+                detail: {
+                  select: {
+                    item: {
+                      select: {
+                        report: {
+                          select: {
+                            areaId: true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            additionalVariation: {
+              select: {
+                areaId: true
+              }
+            }
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -50,6 +111,31 @@ export async function getActionPlans() {
     console.error('Error fetching plans:', error);
     return { error: 'Failed to fetch plans' };
   }
+}
+
+export async function getOpenPlansByArea(areaId: string | null) {
+    const session = await getSession();
+    if (!session) return { error: 'Unauthorized' };
+
+    try {
+        const where: any = {
+            status: 'ABIERTO' // Only filter by Status for now + Area below
+        };
+
+        if (areaId) {
+            where.areaId = areaId;
+        }
+
+        const plans = await prisma.actionPlan.findMany({
+            where,
+            select: { id: true, name: true, areaId: true },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        return { success: true, plans };
+    } catch (error) {
+        return { error: 'Failed to fetch open plans' };
+    }
 }
 
 export async function createActionPlan(data: { 
@@ -62,7 +148,8 @@ export async function createActionPlan(data: {
     responsibleId: string;
     startDate: string;
     deadline: string;
-  }[]
+  }[];
+  areaId?: string;
 }) {
   const session = await getSession();
   if (!session || (session.role !== 'MANAGER' && session.role !== 'COORDINATOR' && session.role !== 'ADMIN')) {
@@ -76,10 +163,12 @@ export async function createActionPlan(data: {
     const plan = await prisma.actionPlan.create({
       data: {
         name: data.name,
+        areaId: data.areaId,
         startDate: data.startDate ? new Date(data.startDate) : new Date(),
         endDate: data.endDate ? new Date(data.endDate) : null,
         priority: data.priority || 'MEDIA',
         status: initialStatus,
+        userId: session.userId,
         activities: data.activities && data.activities.length > 0 ? {
           create: data.activities.map(act => ({
             description: act.description,

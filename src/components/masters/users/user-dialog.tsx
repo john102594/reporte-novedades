@@ -33,18 +33,21 @@ interface User {
   role: string;
   username: string | null;
   managedAreas?: Area[];
+  coordinatedAreas?: Area[];
 }
 
-export function UserDialog({ userToEdit, areas = [] }: { userToEdit?: User, areas?: Area[] }) {
+export function UserDialog({ userToEdit, areas = [], currentUserRole }: { userToEdit?: User, areas?: Area[], currentUserRole?: string }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   
   // Managing local state for multi-select areas
-  // Initial state based on userToEdit.managedAreas
-  const initialSelectedAreas = userToEdit?.managedAreas?.map(a => a.id) || [];
+  // Initial state based on userToEdit's areas - check both managedAreas and coordinatedAreas
+  const initialSelectedAreas = [
+    ...(userToEdit?.managedAreas?.map(a => a.id) || []),
+    ...(userToEdit?.coordinatedAreas?.map(a => a.id) || [])
+  ];
   // Since we are using standard form submission, we can use hidden inputs or just handle it if we were doing fetch.
   // But standard form action with checkboxes works if we name them 'areaIds'.
-  // Let's rely on native FormData handling for checkboxes with same name.
 
   async function clientAction(formData: FormData) {
     const res = userToEdit 
@@ -136,10 +139,19 @@ export function UserDialog({ userToEdit, areas = [] }: { userToEdit?: User, area
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MANAGER">Admin (Jefe - Full Access)</SelectItem>
-                <SelectItem value="GESTOR">Gestor (Manager - View Only)</SelectItem>
-                <SelectItem value="COORDINATOR">Coordinator</SelectItem>
-                <SelectItem value="OPERATOR">Operator</SelectItem>
+                {(currentUserRole === 'ADMIN') && (
+                    <>
+                        <SelectItem value="ADMIN">Admin (Superuser)</SelectItem>
+                        <SelectItem value="MANAGER">Manager (Jefe de Area)</SelectItem>
+                    </>
+                )}
+                {(currentUserRole === 'ADMIN' || currentUserRole === 'MANAGER') && (
+                    <SelectItem value="COORDINATOR">Coordinator</SelectItem>
+                )}
+                {(currentUserRole === 'ADMIN' || currentUserRole === 'MANAGER' || currentUserRole === 'COORDINATOR') && (
+                    <SelectItem value="GESTOR">Gestor</SelectItem>
+                )}
+                {/* Operator is now handled separately, removed from here */}
               </SelectContent>
             </Select>
           </div>

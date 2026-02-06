@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,10 +35,12 @@ interface VariationTypeActionsProps {
     visibleToGestor: boolean;
     sortOrder: number;
     isActive: boolean;
+    areas?: { id: string; name: string }[];
   };
+  availableAreas?: { id: string; name: string }[];
 }
 
-export function VariationTypeActions({ variationType }: VariationTypeActionsProps) {
+export function VariationTypeActions({ variationType, availableAreas = [] }: VariationTypeActionsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -89,6 +90,7 @@ export function VariationTypeActions({ variationType }: VariationTypeActionsProp
     <>
       <VariationTypeDialog 
         initialData={variationType}
+        availableAreas={availableAreas}
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
       />

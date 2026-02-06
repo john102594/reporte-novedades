@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { getAllowedAreaIds, getAllowedAreas } from '@/lib/abac';
 import { MachineDialog } from '@/components/masters/machines/machine-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,14 @@ import { Settings, Factory } from 'lucide-react';
 import { MachineActions } from '@/components/masters/machines/machine-actions';
 
 export default async function MachinesPage() {
+  // ABAC: Get user's allowed area IDs
+  const allowedAreaIds = await getAllowedAreaIds();
+  
+  // Build where clause for area filtering
+  const areaWhere = allowedAreaIds ? { areaId: { in: allowedAreaIds } } : {};
+  
   const machines = await prisma.machine.findMany({
+    where: areaWhere,
     include: { 
       area: true, 
       _count: { select: { operators: true } },
@@ -22,11 +30,15 @@ export default async function MachinesPage() {
     }
   });
   
-  const areas = await prisma.area.findMany({ select: { id: true, name: true } });
+  // Get only allowed areas (for dropdown)
+  const areas = await getAllowedAreas();
   
-  const operators = await prisma.user.findMany({
-    where: { role: 'OPERATOR' },
-    select: { id: true, name: true, managedAreas: { select: { id: true } } },
+  // Get operators from allowed areas
+  const operators = await prisma.operator.findMany({
+    where: allowedAreaIds ? { 
+      areaId: { in: allowedAreaIds }
+    } : {},
+    select: { id: true, name: true, areaId: true },
     orderBy: { name: 'asc' }
   });
 

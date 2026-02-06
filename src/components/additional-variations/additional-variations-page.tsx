@@ -36,15 +36,15 @@ interface Variation {
 }
 
 interface AdditionalVariationsPageProps {
-  currentUser: { id: string; role: string } | null;
-  users: { id: string; name: string | null; role: string }[];
+  currentUser: { id: string; role: string; allowedAreas: { id: string; name: string }[] } | null;
+  operators: { id: string; name: string; areaId: string }[];
   causes: { id: string; name: string }[];
   openPlans: { id: string; name: string }[];
 }
 
 export default function AdditionalVariationsPage({ 
   currentUser, 
-  users, 
+  operators, 
   causes, 
   openPlans 
 }: AdditionalVariationsPageProps) {
@@ -237,7 +237,7 @@ export default function AdditionalVariationsPage({
                 variations={variations} 
                 onRefresh={loadVariations}
                 currentUser={currentUser}
-                users={users}
+                operators={operators}
                 causes={causes}
                 openPlans={openPlans}
               />
@@ -245,7 +245,7 @@ export default function AdditionalVariationsPage({
           </TabsContent>
 
           <TabsContent value="create" className="flex justify-center">
-            <VariationForm onSuccess={handleFormSuccess} />
+            <VariationForm onSuccess={handleFormSuccess} currentUser={currentUser} operators={operators} />
           </TabsContent>
         </Tabs>
       </div>

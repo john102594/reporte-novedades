@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { canPerformAction, validateAreaAccess } from '@/lib/abac';
 
 interface StandardData {
   machineId: string;
@@ -15,12 +16,29 @@ interface StandardData {
 export async function upsertStandard(data: StandardData) {
   if (!data.machineId) return { error: 'Machine is required' };
 
-  try {
-    // Check if standard exists for this machine
-    const existing = await prisma.standard.findFirst({
-      where: { machineId: data.machineId }
-    });
+  // Get the machine to validate area access
+  const machine = await prisma.machine.findUnique({
+    where: { id: data.machineId },
+    select: { areaId: true }
+  });
 
+  if (!machine) return { error: 'Machine not found' };
+
+  // Check if standard exists for this machine
+  const existing = await prisma.standard.findFirst({
+    where: { machineId: data.machineId }
+  });
+
+  // ABAC: Check role permission (edit if exists, create if new)
+  const action = existing ? 'edit:standard' : 'create:standard';
+  const roleCheck = await canPerformAction(action);
+  if (!roleCheck.allowed) return { error: roleCheck.reason };
+
+  // ABAC: Validate area access via machine
+  const areaCheck = await validateAreaAccess(machine.areaId);
+  if (!areaCheck.allowed) return { error: areaCheck.reason };
+
+  try {
     if (existing) {
       await prisma.standard.update({
         where: { id: existing.id },
@@ -53,6 +71,21 @@ export async function upsertStandard(data: StandardData) {
 }
 
 export async function deleteStandard(id: string) {
+  // ABAC: Check role permission
+  const roleCheck = await canPerformAction('delete:standard');
+  if (!roleCheck.allowed) return { error: roleCheck.reason };
+
+  // Find standard and validate area access via machine
+  const standard = await prisma.standard.findUnique({
+    where: { id },
+    include: { machine: { select: { areaId: true } } }
+  });
+
+  if (!standard) return { error: 'Standard not found' };
+
+  const areaCheck = await validateAreaAccess(standard.machine.areaId);
+  if (!areaCheck.allowed) return { error: areaCheck.reason };
+
   try {
     await prisma.standard.delete({ where: { id } });
     revalidatePath('/masters/standards');

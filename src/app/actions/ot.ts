@@ -56,6 +56,9 @@ export async function searchOT(otNumber: string) {
           createdBy: {
              select: { id: true, name: true }
           },
+          area: {
+             select: { id: true, name: true }
+          },
           responsibleOperators: {
             include: {
               operator: {

@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
+import { getAllowedAreas } from '@/lib/abac';
 import { Badge } from '@/components/ui/badge';
-import { Tag, Check, X, Eye, EyeOff } from 'lucide-react';
+import { Tag, Check, X, Eye, EyeOff, MapPin } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,14 +14,28 @@ import { VariationTypeDialog } from '@/components/masters/variation-types/variat
 import { VariationTypeActions } from '@/components/masters/variation-types/variation-type-actions';
 
 export default async function VariationTypesPage() {
-  const types = await prisma.variationType.findMany({
-    orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
-    include: {
-      _count: {
-        select: { additionalVariations: true }
+  const [types, areas] = await Promise.all([
+    prisma.variationType.findMany({
+      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+      include: {
+        _count: {
+          select: { additionalVariations: true }
+        },
+        areas: {
+          include: {
+            area: { select: { id: true, name: true } }
+          }
+        }
       }
-    }
-  });
+    }),
+    getAllowedAreas()
+  ]);
+
+  // Transform types to include areas in the expected format
+  const typesWithAreas = types.map(type => ({
+    ...type,
+    areas: type.areas.map(a => ({ id: a.area.id, name: a.area.name }))
+  }));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -33,7 +48,7 @@ export default async function VariationTypesPage() {
             Configure los tipos de variación disponibles para reportes y post-reportes.
           </p>
         </div>
-        <VariationTypeDialog />
+        <VariationTypeDialog availableAreas={areas} />
       </div>
 
       <div className="rounded-md border border-border bg-card">
@@ -41,8 +56,9 @@ export default async function VariationTypesPage() {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Código</TableHead>
-              <TableHead className="w-[250px]">Nombre</TableHead>
+              <TableHead className="w-[200px]">Nombre</TableHead>
               <TableHead>Categoría</TableHead>
+              <TableHead>Áreas</TableHead>
               <TableHead className="text-center">Visible Gestor</TableHead>
               <TableHead className="text-center">Activo</TableHead>
               <TableHead className="text-center">Uso</TableHead>
@@ -50,7 +66,7 @@ export default async function VariationTypesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {types.map((type) => (
+            {typesWithAreas.map((type) => (
               <TableRow key={type.id} className="hover:bg-muted/50">
                 <TableCell className="font-mono font-bold text-primary">
                   {type.code}
@@ -78,6 +94,24 @@ export default async function VariationTypesPage() {
                     {type.category}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  {type.areas.length === 0 ? (
+                    <span className="text-xs text-muted-foreground italic">Global</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {type.areas.map(area => (
+                        <Badge 
+                          key={area.id} 
+                          variant="secondary" 
+                          className="text-xs flex items-center gap-1"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          {area.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-center">
                   {type.visibleToGestor ? (
                     <Eye className="w-4 h-4 text-green-500 mx-auto" />
@@ -98,13 +132,13 @@ export default async function VariationTypesPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <VariationTypeActions variationType={type} />
+                  <VariationTypeActions variationType={type} availableAreas={areas} />
                 </TableCell>
               </TableRow>
             ))}
             {types.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   No hay tipos de variación. Cree el primero.
                 </TableCell>
               </TableRow>
@@ -122,6 +156,10 @@ export default async function VariationTypesPage() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="border-amber-300 text-amber-600 bg-amber-50">ADICIONAL</Badge>
           <span>Post-reporte (Desperdicio adicional, Rechazo) - solo Coordinador/Manager</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="italic">Global</span>
+          <span>= Visible en todas las áreas</span>
         </div>
       </div>
     </div>

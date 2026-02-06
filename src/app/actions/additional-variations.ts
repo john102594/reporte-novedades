@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getSession } from './auth';
+import { getAllowedAreaIds, validateAreaAccess, canPerformAction } from '@/lib/abac';
 
 // Types for additional variations
 export type VariationStatus = 'PENDIENTE' | 'EN_ANALISIS' | 'RESUELTO';
@@ -14,6 +15,7 @@ export interface CreateAdditionalVariationInput {
   description?: string;
   causeId?: string; // New: Selected FailureProgram
   operatorIds: string[];
+  areaId: string; // Required for isolation
 }
 
 export interface AdditionalVariationFilters {
@@ -23,6 +25,14 @@ export interface AdditionalVariationFilters {
   operatorId?: string;
   startDate?: Date;
   endDate?: Date;
+  areaId?: string;
+}
+
+interface OperatorInfo {
+  id: string; 
+  name: string; // Removed null
+  shifts: string[];
+  areaId: string;
 }
 
 // Get operators who worked on a specific OT
@@ -34,7 +44,7 @@ export async function getOperatorsByOT(ot: string) {
       item: {
         include: {
           operator: {
-            select: { id: true, name: true }
+            select: { id: true, name: true, areaId: true }
           },
           report: {
             select: { date: true, shift: true }
@@ -45,7 +55,7 @@ export async function getOperatorsByOT(ot: string) {
   });
 
   // Extract unique operators
-  const operatorMap = new Map<string, { id: string; name: string | null; shifts: string[] }>();
+  const operatorMap = new Map<string, OperatorInfo>();
   
   for (const detail of details) {
     if (detail.item.operator) {
@@ -61,7 +71,8 @@ export async function getOperatorsByOT(ot: string) {
         operatorMap.set(op.id, {
           id: op.id,
           name: op.name,
-          shifts: [shiftInfo]
+          shifts: [shiftInfo],
+          areaId: op.areaId // Now available on Operator model
         });
       }
     }
@@ -78,11 +89,13 @@ export async function checkOTExists(ot: string) {
   return count > 0;
 }
 
-// Get variation types (for dropdowns)
+// Get variation types (for dropdowns) - with area filtering
 export async function getVariationTypes(options?: { 
   category?: 'OPERATIVA' | 'ADICIONAL';
   visibleToGestor?: boolean;
+  areaId?: string; // Filter by specific area
 }) {
+  const allowedIds = await getAllowedAreaIds();
   const where: any = { isActive: true };
   
   if (options?.category) {
@@ -93,9 +106,38 @@ export async function getVariationTypes(options?: {
     where.visibleToGestor = options.visibleToGestor;
   }
   
+  // ABAC: Filter by areas assigned to the type AND user's allowed areas
+  // Types with NO areas assigned are considered global (visible to all)
+  if (allowedIds !== null) {
+    // Non-admin: filter by allowed areas OR types with no area restrictions
+    where.OR = [
+      { areas: { none: {} } }, // Global types (no areas assigned)
+      { 
+        areas: { 
+          some: { 
+            areaId: options?.areaId 
+              ? { in: [options.areaId].filter(id => allowedIds.includes(id)) }
+              : { in: allowedIds } 
+          } 
+        } 
+      }
+    ];
+  } else if (options?.areaId) {
+    // Admin with specific area filter
+    where.OR = [
+      { areas: { none: {} } }, // Global types
+      { areas: { some: { areaId: options.areaId } } }
+    ];
+  }
+  
   const types = await prisma.variationType.findMany({
     where,
-    orderBy: { sortOrder: 'asc' }
+    orderBy: { sortOrder: 'asc' },
+    include: {
+      areas: {
+        include: { area: { select: { id: true, name: true } } }
+      }
+    }
   });
   
   return types.map(t => ({
@@ -104,7 +146,8 @@ export async function getVariationTypes(options?: {
     code: t.code,
     description: t.description,
     category: t.category,
-    visibleToGestor: t.visibleToGestor
+    visibleToGestor: t.visibleToGestor,
+    areas: t.areas.map(a => ({ id: a.area.id, name: a.area.name }))
   }));
 }
 
@@ -170,6 +213,7 @@ export async function createAdditionalVariation(input: CreateAdditionalVariation
           quantity: input.quantity,
           description: input.description,
           createdById: session.userId,
+          areaId: input.areaId,
           responsibleOperators: {
             create: input.operatorIds.map(operatorId => ({
               operatorId
@@ -252,6 +296,12 @@ export async function getAdditionalVariations(filters?: AdditionalVariationFilte
     if (filters.endDate) {
       where.createdAt.lte = filters.endDate;
     }
+  }
+
+  // Filter by Area (Isolation) using ABAC
+  const allowedIds = await getAllowedAreaIds();
+  if (allowedIds !== null) {
+    where.areaId = { in: allowedIds };
   }
 
   const variations = await prisma.additionalVariation.findMany({
@@ -403,6 +453,7 @@ export async function createVariationType(data: {
   category: 'OPERATIVA' | 'ADICIONAL';
   visibleToGestor: boolean;
   sortOrder?: number;
+  areaIds?: string[]; // Optional: areas where this type is visible
 }) {
   const session = await getSession();
   if (!session) return { error: 'No autorizado' };
@@ -424,7 +475,16 @@ export async function createVariationType(data: {
         description: data.description,
         category: data.category,
         visibleToGestor: data.visibleToGestor,
-        sortOrder: data.sortOrder || 0
+        sortOrder: data.sortOrder || 0,
+        // Create area relationships if provided
+        ...(data.areaIds && data.areaIds.length > 0 && {
+          areas: {
+            create: data.areaIds.map(areaId => ({ areaId }))
+          }
+        })
+      },
+      include: {
+        areas: { include: { area: { select: { id: true, name: true } } } }
       }
     });
     
@@ -448,15 +508,39 @@ export async function updateVariationType(
     visibleToGestor: boolean;
     isActive: boolean;
     sortOrder: number;
+    areaIds: string[]; // Update area assignments
   }>
 ) {
   const session = await getSession();
   if (!session) return { error: 'No autorizado' };
 
   try {
+    // Extract areaIds from data for separate handling
+    const { areaIds, ...updateData } = data;
+    
+    // If areaIds is provided, update area relationships in a transaction
+    if (areaIds !== undefined) {
+      await prisma.$transaction([
+        // Delete existing area relationships
+        prisma.variationTypeArea.deleteMany({
+          where: { variationTypeId: id }
+        }),
+        // Create new area relationships
+        ...(areaIds.length > 0 ? [
+          prisma.variationTypeArea.createMany({
+            data: areaIds.map(areaId => ({ variationTypeId: id, areaId }))
+          })
+        ] : [])
+      ]);
+    }
+    
+    // Update other fields if any
     const type = await prisma.variationType.update({
       where: { id },
-      data
+      data: updateData,
+      include: {
+        areas: { include: { area: { select: { id: true, name: true } } } }
+      }
     });
     
     revalidatePath('/masters/variation-types');

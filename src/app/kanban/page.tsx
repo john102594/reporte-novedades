@@ -1,8 +1,46 @@
 import prisma from '@/lib/prisma';
 import { KanbanBoard } from '@/components/kanban/board';
+import { getCurrentUser } from '@/app/actions/auth';
+import { redirect } from 'next/navigation';
 
 export default async function KanbanPage() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect('/login');
+
+  const where: any = {};
+  if (currentUser.role !== 'ADMIN') {
+      const allowedIds = currentUser.allowedAreas.map(a => a.id);
+      if (allowedIds.length > 0) {
+          where.tasks = {
+              some: {
+                  OR: [
+                      {
+                          variation: {
+                              detail: {
+                                  item: {
+                                      report: {
+                                          areaId: { in: allowedIds }
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      {
+                          additionalVariation: {
+                              areaId: { in: allowedIds }
+                          }
+                      }
+                  ]
+              }
+          };
+      } else {
+          // If no allowed areas, show nothing (or handle better)
+          where.id = 'NO_ACCESS'; 
+      }
+  }
+
   const plans = await prisma.actionPlan.findMany({
+    where,
     include: {
       user: { select: { name: true } },
       tasks: { select: { cause: true } }

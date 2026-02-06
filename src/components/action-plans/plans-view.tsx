@@ -71,7 +71,13 @@ import { cn } from '@/lib/utils';
 
 interface PlansViewProps {
   currentUser: { id: string; role: string } | null;
-  users: { id: string; name: string | null; role: string }[];
+  users: { 
+    id: string; 
+    name: string | null; 
+    role: string;
+    managedAreas?: { id: string }[];
+    coordinatedAreas?: { id: string }[];
+  }[];
 }
 
 export default function PlansView({ currentUser, users }: PlansViewProps) {
@@ -428,6 +434,25 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                     progress = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
                   }
 
+
+                  // Determine Area ID from the first task that has one
+                  // Check standard variation or additional variation
+                  const planAreaId = plan.tasks?.find((t: any) => 
+                    t.variation?.detail?.item?.report?.areaId || 
+                    t.additionalVariation?.areaId
+                  )?.variation?.detail?.item?.report?.areaId 
+                  || plan.tasks?.find((t: any) => t.additionalVariation?.areaId)?.additionalVariation?.areaId;
+
+                  // Filter users for this plan
+                  const planSpecificUsers = assignableUsers.filter(u => {
+                      if (u.role === 'ADMIN') return true; 
+                      if (!planAreaId) return true; // Fallback if no area linked
+
+                      const manages = u.managedAreas?.some((a: any) => a.id === planAreaId);
+                      const coordinates = u.coordinatedAreas?.some((a: any) => a.id === planAreaId);
+                      return manages || coordinates;
+                  });
+
                   const activityDeadlines = plan.activities?.map((a: any) => new Date(a.deadline).getTime()) || [];
                   const maxDeadline = activityDeadlines.length > 0 ? new Date(Math.max(...activityDeadlines)) : null;
                   const startDate = new Date(plan.startDate);
@@ -608,7 +633,7 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                                                                   <SelectValue placeholder="Responsable" />
                                                               </SelectTrigger>
                                                               <SelectContent className="bg-white dark:bg-zinc-950 border-slate-200">
-                                                                  {assignableUsers.map((user) => (
+                                                                  {planSpecificUsers.map((user) => (
                                                                       <SelectItem key={user.id} value={user.id}>
                                                                           {user.name}
                                                                       </SelectItem>
@@ -744,7 +769,7 @@ export default function PlansView({ currentUser, users }: PlansViewProps) {
                                                           <SelectValue placeholder="Asignar..." />
                                                       </SelectTrigger>
                                                       <SelectContent className="bg-white rounded-xl">
-                                                          {assignableUsers.map(u => (
+                                                          {planSpecificUsers.map(u => (
                                                               <SelectItem key={u.id} value={u.id} className="text-xs">{u.name}</SelectItem>
                                                           ))}
                                                       </SelectContent>

@@ -11,13 +11,36 @@ export default async function ProductionPage() {
   if (!session) redirect('/login');
 
   let areas;
-  if (session.role === 'MANAGER') {
+  if (session.role === 'ADMIN') {
+    // ADMIN sees all areas
     areas = await prisma.area.findMany({
         select: { id: true, name: true },
         orderBy: { name: 'asc' }
     });
+  } else if (session.role === 'MANAGER') {
+    // MANAGER sees only their managed areas (via gestores relation = managedAreas)
+    areas = await prisma.area.findMany({
+        where: {
+            gestores: {
+                some: { id: session.userId }
+            }
+        },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+    });
+  } else if (session.role === 'COORDINATOR') {
+    // COORDINATOR sees only their coordinated areas
+    areas = await prisma.area.findMany({
+        where: {
+            coordinators: {
+                some: { id: session.userId }
+            }
+        },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+    });
   } else {
-    // Only fetch areas assigned to this user
+    // GESTOR sees only their assigned areas
     areas = await prisma.area.findMany({
         where: {
             gestores: {

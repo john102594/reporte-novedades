@@ -30,7 +30,13 @@ import { cn } from '@/lib/utils';
 
 interface ActivitiesViewProps {
   currentUser: { id: string; role: string } | null;
-  users: { id: string; name: string | null; role: string }[];
+  users: { 
+    id: string; 
+    name: string | null; 
+    role: string;
+    managedAreas?: { id: string }[];
+    coordinatedAreas?: { id: string }[];
+  }[];
   defaultResponsibleId?: string;
 }
 
@@ -267,6 +273,26 @@ export default function ActivitiesView({ currentUser, users, defaultResponsibleI
                 const edits = bufferedEdits[activity.id];
                 const isEditing = !!edits;
                 
+
+
+                // Determine Activity Area ID from Plan
+                // This logic mirrors plans-view.tsx
+                const activityAreaId = activity.plan?.tasks?.find((t: any) => 
+                  t.variation?.detail?.item?.report?.areaId || 
+                  t.additionalVariation?.areaId
+                )?.variation?.detail?.item?.report?.areaId 
+                || activity.plan?.tasks?.find((t: any) => t.additionalVariation?.areaId)?.additionalVariation?.areaId;
+
+                // Filter users for this specific activity
+                const activityUsers = users.filter(u => {
+                    if (u.role === 'ADMIN') return true; 
+                    if (!activityAreaId) return true; // Fallback
+
+                    const manages = u.managedAreas?.some((a: any) => a.id === activityAreaId);
+                    const coordinates = u.coordinatedAreas?.some((a: any) => a.id === activityAreaId);
+                    return manages || coordinates;
+                });
+                
                 return (
                   <TableRow 
                     key={activity.id} 
@@ -326,7 +352,7 @@ export default function ActivitiesView({ currentUser, users, defaultResponsibleI
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-white rounded-xl">
-                            {users.map((user) => (
+                            {activityUsers.map((user) => (
                               <SelectItem key={user.id} value={user.id} className="text-xs">
                                 {user.name}
                               </SelectItem>

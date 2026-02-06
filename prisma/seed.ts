@@ -11,6 +11,8 @@ async function main() {
     await prisma.planActivity.deleteMany();
     await prisma.actionTask.deleteMany();
     await prisma.actionPlan.deleteMany();
+    await prisma.additionalVariationOperator.deleteMany();
+    await prisma.additionalVariation.deleteMany();
     await prisma.variationRecord.deleteMany(); 
     await prisma.shiftReportVariation.deleteMany();
     await prisma.shiftReportDetail.deleteMany();
@@ -20,6 +22,7 @@ async function main() {
     await prisma.standard.deleteMany();
     await prisma.failureProgram.deleteMany();
     await prisma.machine.deleteMany();
+    await prisma.operator.deleteMany();
     await prisma.area.deleteMany();
     await prisma.user.deleteMany();
     console.log('🧹 Database cleaned');
@@ -80,30 +83,38 @@ async function main() {
   }
   console.log(`⚠️  Created ${causeNames.length} causes`);
 
-  // 4. Create Operators
+  // 4. Create Operators on Operator Table (Not User table)
+  // We need 4 operators per machine.
+  // We have 6 machines: Impresora 1..10
+  // Total operators needed: 6 * 4 = 24
+  
   const operatorIds = [];
-  for (let i = 1; i <= 21; i++) {
-    const user = await prisma.user.create({
+  let opCount = 1;
+  const totalOperators = machines.length * 4;
+
+  for (let i = 1; i <= totalOperators; i++) {
+    const operator = await prisma.operator.create({
       data: {
         name: `Operario ${i}`,
-        username: `operario${i}`,
-        email: `op${i}@example.com`,
-        role: 'OPERATOR',
-        password: '123'
+        status: 'ACTIVE',
+        areaId: area.id // All in Impresion
       }
     });
-    operatorIds.push(user.id);
+    operatorIds.push(operator.id);
   }
-  console.log(`👷 Created 21 Operators`);
+  console.log(`👷 Created ${totalOperators} Operators in Operator table`);
 
   // 5. Assign 4 Operators per Machine
-  // We cycle through operators
   let opIndex = 0;
   for (const machine of machines) {
     const assignedOps = [];
     for(let k=0; k<4; k++) {
-        assignedOps.push({ id: operatorIds[opIndex % operatorIds.length] });
-        opIndex++;
+        // Ensure we don't go out of bounds if something is off, 
+        // using modulo just in case but with exact count it should be fine
+        if (opIndex < operatorIds.length) {
+            assignedOps.push({ id: operatorIds[opIndex] });
+            opIndex++;
+        }
     }
     
     await prisma.machine.update({
@@ -114,11 +125,13 @@ async function main() {
             }
         }
     });
-    // Double check from User side? No need, many-to-many handles it.
   }
-  console.log(`🔗 Assigned 4 operators to each machine`);
+  console.log(`🔗 Assigned 4 distinct operators to each machine`);
 
   // 6. Create Management Users
+  await prisma.user.create({
+    data: { name: 'Admin User', username: 'admin', role: 'ADMIN', password: 'admin' }
+  });
   await prisma.user.create({
     data: { name: 'Manager User', username: 'JRODRI', role: 'MANAGER', password: '123' }
   });

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -15,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { createVariationType, updateVariationType } from '@/app/actions/additional-variations';
@@ -30,13 +31,21 @@ interface VariationTypeDialogProps {
     visibleToGestor: boolean;
     sortOrder: number;
     isActive: boolean;
+    areas?: { id: string; name: string }[];
   };
+  availableAreas?: { id: string; name: string }[];
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-export function VariationTypeDialog({ initialData, trigger, open: controlledOpen, onOpenChange: setControlledOpen }: VariationTypeDialogProps) {
+export function VariationTypeDialog({ 
+  initialData, 
+  availableAreas = [],
+  trigger, 
+  open: controlledOpen, 
+  onOpenChange: setControlledOpen 
+}: VariationTypeDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   
   const isControlled = controlledOpen !== undefined;
@@ -55,9 +64,34 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
   const [visibleToGestor, setVisibleToGestor] = useState(initialData?.visibleToGestor ?? true);
   const [isActive, setIsActive] = useState(initialData?.isActive ?? true);
   const [sortOrder, setSortOrder] = useState(initialData?.sortOrder?.toString() || '0');
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>(
+    initialData?.areas?.map(a => a.id) || []
+  );
   
   const router = useRouter();
   const isEditing = !!initialData;
+
+  // Reset form when dialog opens with new data
+  useEffect(() => {
+    if (open) {
+      setName(initialData?.name || '');
+      setCode(initialData?.code || '');
+      setDescription(initialData?.description || '');
+      setCategory((initialData?.category as any) || 'ADICIONAL');
+      setVisibleToGestor(initialData?.visibleToGestor ?? true);
+      setIsActive(initialData?.isActive ?? true);
+      setSortOrder(initialData?.sortOrder?.toString() || '0');
+      setSelectedAreaIds(initialData?.areas?.map(a => a.id) || []);
+    }
+  }, [open, initialData]);
+
+  const handleAreaToggle = (areaId: string) => {
+    setSelectedAreaIds(prev => 
+      prev.includes(areaId)
+        ? prev.filter(id => id !== areaId)
+        : [...prev, areaId]
+    );
+  };
 
   const handleSubmit = async () => {
     if (!name.trim() || !code.trim()) {
@@ -77,7 +111,8 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
           category,
           visibleToGestor,
           isActive,
-          sortOrder: parseInt(sortOrder) || 0
+          sortOrder: parseInt(sortOrder) || 0,
+          areaIds: selectedAreaIds
         });
 
         if (result.error) {
@@ -95,7 +130,8 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
           description: description.trim() || undefined,
           category,
           visibleToGestor,
-          sortOrder: parseInt(sortOrder) || 0
+          sortOrder: parseInt(sortOrder) || 0,
+          areaIds: selectedAreaIds.length > 0 ? selectedAreaIds : undefined
         });
 
         if (result.error) {
@@ -110,6 +146,7 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
           setCategory('ADICIONAL');
           setVisibleToGestor(true);
           setSortOrder('0');
+          setSelectedAreaIds([]);
           router.refresh();
         }
       }
@@ -135,7 +172,7 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar' : 'Nuevo'} Tipo de Variación</DialogTitle>
           <DialogDescription>
@@ -201,6 +238,40 @@ export function VariationTypeDialog({ initialData, trigger, open: controlledOpen
               />
             </div>
           </div>
+
+          {/* Areas Assignment */}
+          {availableAreas.length > 0 && (
+            <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-200/50 dark:border-blue-800/30">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Áreas Asignadas</Label>
+                <p className="text-sm text-muted-foreground">
+                  Seleccione las áreas donde este tipo será visible. Si no selecciona ninguna, será global.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {availableAreas.map(area => (
+                  <div key={area.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`area-${area.id}`}
+                      checked={selectedAreaIds.includes(area.id)}
+                      onCheckedChange={() => handleAreaToggle(area.id)}
+                    />
+                    <label
+                      htmlFor={`area-${area.id}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {area.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {selectedAreaIds.length === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                  ⚠️ Sin áreas seleccionadas, el tipo será visible en TODAS las áreas.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-4 p-5 bg-muted/50 rounded-xl border border-muted">
             <div className="flex items-center justify-between">

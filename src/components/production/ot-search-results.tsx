@@ -67,6 +67,12 @@ export function OTSearchResults({ results }: OTSearchResultsProps) {
                            <div className="flex items-center gap-1">
                               <span className="font-bold text-muted-foreground uppercase text-[10px]">Reportado por:</span>
                               <span className="font-medium text-foreground">{av.createdBy?.name || 'Desconocido'}</span>
+                              {av.area?.name && (
+                                 <>
+                                    <span className="text-muted-foreground mx-1">•</span>
+                                    <span className="font-medium text-primary/80">{av.area.name}</span>
+                                 </>
+                              )}
                            </div>
                         </div>
 

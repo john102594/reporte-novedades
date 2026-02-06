@@ -16,7 +16,13 @@ export default async function ActionPlansRoute() {
       where: {
         role: { in: ['MANAGER', 'COORDINATOR'] }
       },
-      select: { id: true, name: true, role: true }
+      select: { 
+        id: true, 
+        name: true, 
+        role: true,
+        managedAreas: { select: { id: true } },
+        coordinatedAreas: { select: { id: true } }
+      }
     })
   ]);
 

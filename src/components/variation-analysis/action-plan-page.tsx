@@ -19,12 +19,15 @@ interface ActionTask {
   status: string;
   createdAt: Date;
   responsibleId: string | null;
-  responsible: { name: string | null } | null;
+  responsible: { id: string; name: string | null; role: string } | null;
+  variationType?: { id: string; name: string } | null;
+  areaId?: string | null;
   actionPlanId: string | null;
   actionPlan?: { 
     id: string; 
     name: string; 
     status: string;
+    priority?: string;
     startDate?: string | Date;
     activities?: {
       id: string;
@@ -32,7 +35,7 @@ interface ActionTask {
       responsibleId: string;
       startDate: string | Date;
       deadline: string | Date;
-      responsible?: { name: string | null };
+      responsible?: { id: string; name: string | null; role: string };
     }[]
   } | null;
   activities: any[];
@@ -42,7 +45,7 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
   currentUser: { id: string; role: string } | null, 
   users: { id: string; name: string | null; role: string }[], 
   causes: { id: string; name: string }[],
-  openPlans: { id: string; name: string }[]
+  openPlans: { id: string; name: string; areaId?: string | null }[]
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -67,13 +70,14 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
     router.push('/variation-analysis');
   };
 
-  const handleDialogClose = (open: boolean) => {
-    if (!open) {
-        // Remove taskId from URL but keep other state if needed, or just clear all
-        const newParams = new URLSearchParams(searchParams.toString());
+  const handleOpenChange = (taskId: string, open: boolean) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+    if (open) {
+        newParams.set('taskId', taskId);
+    } else {
         newParams.delete('taskId');
-        router.push(`/variation-analysis?${newParams.toString()}`);
     }
+    router.push(`/variation-analysis?${newParams.toString()}`);
   };
 
   const fetchTasks = async (showLoading = true) => {
@@ -251,7 +255,7 @@ export default function ActionPlanPage({ currentUser, users, causes, openPlans }
                       openPlans={openPlans}
                       onUpdate={() => fetchTasks(false)} 
                       externalOpen={activeTaskId === task.id}
-                      onExternalOpenChange={handleDialogClose}
+                      onExternalOpenChange={(open) => handleOpenChange(task.id, open)}
                     />
                   </TableCell>
                 </TableRow>

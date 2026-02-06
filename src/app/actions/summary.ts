@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
+import { getAllowedAreaIds, getAllowedAreas } from '@/lib/abac';
 
 export interface SummaryDetail {
   id: string; // Detail ID or Generated ID
@@ -44,18 +45,29 @@ export async function getProductionSummary(
     // Ensure accurate daily boundaries (UTC usually, but let's be careful with what passes in)
     // Assuming the dates passed are already what the user intends (e.g. 00:00 to 23:59 local interpreted as UTC)
     
+    // ABAC: Get user's allowed area IDs
+    const allowedAreaIds = await getAllowedAreaIds();
+
     const whereClause: any = {
       date: {
         gte: startDate,
         lte: endDate,
       },
       status: {
-        not: 'DELETED' // Assuming we might have this, or just fetch all
+        not: 'DELETED'
       }
     };
 
+    // ABAC: Apply area filter
     if (areaId && areaId !== 'all') {
+      // If specific area selected, validate access
+      if (allowedAreaIds !== null && !allowedAreaIds.includes(areaId)) {
+        return { error: 'No tienes acceso a esta área.' };
+      }
       whereClause.areaId = areaId;
+    } else if (allowedAreaIds !== null) {
+      // If no specific area, filter by all allowed areas
+      whereClause.areaId = { in: allowedAreaIds };
     }
 
     const reports = await prisma.shiftReport.findMany({
@@ -287,10 +299,8 @@ export async function getProductionSummary(
 
 export async function getAreas() {
   try {
-    const areas = await prisma.area.findMany({
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true }
-    });
+    // ABAC: Return only allowed areas
+    const areas = await getAllowedAreas();
     return areas;
   } catch (error) {
     return [];

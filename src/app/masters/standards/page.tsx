@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { getAllowedAreaIds } from '@/lib/abac';
 import { StandardDialog } from '@/components/masters/standards/standard-dialog';
 import { StandardActions } from '@/components/masters/standards/standard-actions';
 import { Badge } from '@/components/ui/badge';
@@ -13,11 +14,19 @@ import {
 } from "@/components/ui/table";
 
 export default async function StandardsPage() {
+  // ABAC: Get user's allowed area IDs
+  const allowedAreaIds = await getAllowedAreaIds();
+  
+  // Build where clause - filter by machine's area
+  const machineWhere = allowedAreaIds ? { areaId: { in: allowedAreaIds } } : {};
+  
   const standards = await prisma.standard.findMany({
+    where: allowedAreaIds ? { machine: { areaId: { in: allowedAreaIds } } } : {},
     include: { machine: { include: { area: true } } }
   });
   
   const machines = await prisma.machine.findMany({
+    where: machineWhere,
     include: { area: true }
   });
 

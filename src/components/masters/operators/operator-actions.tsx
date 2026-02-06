@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteUser } from '@/app/actions/users';
+import { deleteOperator } from '@/app/actions/operators';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import { UserDialog } from './user-dialog';
+import { OperatorDialog } from './operator-dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,34 +15,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '../../ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 
-interface ActionProps {
-  user: {
+interface Operator {
     id: string;
-    name: string | null;
-    email: string | null;
-    username: string | null;
-    role: string;
-    managedAreas: { id: string; name: string }[];
-    coordinatedAreas: { id: string; name: string }[];
-  };
-  areas: { id: string; name: string }[];
-  currentUserRole?: string;
+    name: string;
+    status: string;
+    areaId: string;
 }
 
-export function UserActions({ user, areas, currentUserRole }: ActionProps) {
+interface ActionProps {
+  operator: Operator;
+  areas: { id: string; name: string }[];
+}
+
+export function OperatorActions({ operator, areas }: ActionProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDelete() {
     setIsDeleting(true);
-    await deleteUser(user.id);
+    await deleteOperator(operator.id);
     setIsDeleting(false);
   }
 
   return (
     <div className="flex justify-end gap-2">
-      <UserDialog userToEdit={user} areas={areas} currentUserRole={currentUserRole} />
+      <OperatorDialog operatorToEdit={operator} areas={areas} />
       
       <AlertDialog>
         <AlertDialogTrigger asChild>
@@ -54,7 +52,7 @@ export function UserActions({ user, areas, currentUserRole }: ActionProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user "{user.name}".
+              This action cannot be undone. This will permanently delete the operator "{operator.name}".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

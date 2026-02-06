@@ -64,6 +64,7 @@ export function TaskReviewDialog({
     createdAt: string | Date;
     actionPlanId: string | null;
     variationType?: { id: string; name: string } | null;
+    areaId?: string | null;
     actionPlan?: { 
         id: string; 
         name: string; 
@@ -87,7 +88,8 @@ export function TaskReviewDialog({
   currentUser: { id: string, role: string } | null, 
   users: { id: string; name: string | null; role: string }[],
   causes: { id: string; name: string }[],
-  openPlans: { id: string; name: string }[],
+  causes: { id: string; name: string }[],
+  openPlans: { id: string; name: string; areaId?: string | null }[],
   onUpdate: () => void,
   externalOpen?: boolean,
   onExternalOpenChange?: (open: boolean) => void
@@ -118,6 +120,11 @@ export function TaskReviewDialog({
   // Activity Management State
   const [newActivities, setNewActivities] = useState<{description: string, responsibleId: string, startDate: string, deadline: string}[]>([]);
   const [tempActivity, setTempActivity] = useState({description: '', responsibleId: '', startDate: '', deadline: ''});
+
+  // Filter existing plans based on task area
+  const filteredOpenPlans = task.areaId 
+    ? openPlans.filter(p => p.areaId === task.areaId)
+    : openPlans;
 
   // Load activities if plan exists and is in REVISION (for Manager/Coordinator editing)
   useEffect(() => {
@@ -211,6 +218,7 @@ export function TaskReviewDialog({
     // 1. Create Plan with Activities
     const planRes = await createActionPlan({
         name: newPlanName,
+        areaId: task.areaId || undefined,
         priority: newPlanPriority,
         activities: newActivities
     });
@@ -272,12 +280,12 @@ export function TaskReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {!isControlled && (
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Settings2 className="w-4 h-4 text-purple-600" /> Detalle
-          </Button>
-        </DialogTrigger>
+      {currentUser?.role?.toUpperCase() !== 'GESTOR' && (
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Settings2 className="w-4 h-4 text-purple-600" /> Detalle
+        </Button>
+      </DialogTrigger>
       )}
       <DialogContent className="sm:!max-w-[1200px] !w-[95vw] h-[90vh] !p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 rounded-3xl border-slate-200 dark:border-slate-800">
         
@@ -668,9 +676,9 @@ export function TaskReviewDialog({
                                         <SelectValue placeholder="Seleccione un plan..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {openPlans.length > 0 ? openPlans.map(p => (
+                                        {filteredOpenPlans.length > 0 ? filteredOpenPlans.map(p => (
                                             <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                        )) : <div className="p-3 text-sm text-center text-muted-foreground dark:text-slate-500">No hay planes abiertos</div>}
+                                        )) : <div className="p-3 text-sm text-center text-muted-foreground dark:text-slate-500">No hay planes abiertos para esta área</div>}
                                     </SelectContent>
                                 </Select>
                             </div>
